@@ -399,3 +399,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .inventory-card .inventory-main{grid-area:main}.inventory-card .stock-input{grid-area:stock}.inventory-card .status{grid-area:status}.inventory-card .inventory-edit-btn{grid-area:edit;justify-self:end}
   .inventory-edit-grid{grid-template-columns:1fr 1fr}.inventory-edit-grid .form-row:last-child{grid-column:1/-1}
 }
+
+.one-drink-note{display:flex;flex-direction:column;gap:4px;margin:0 0 10px;padding:12px 13px;border:1px solid #8a6537;border-radius:12px;background:#2b2116;color:#f4e4c6}
+.one-drink-note strong{font-size:13px;color:#f0c77d}
+.one-drink-note span{font-size:11px;line-height:1.6}
