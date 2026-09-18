@@ -372,3 +372,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .cling-order-btn{width:100%;min-height:48px;border:0;border-radius:13px;background:var(--accent);color:#21170a;font-size:13px;font-weight:1000}
 .cling-promo>small{display:block;margin-top:8px;color:var(--muted);font-size:9px;line-height:1.5}
 @media(max-width:420px){.cling-price-grid{grid-template-columns:1fr}.cling-promo{padding:14px}}
+
+.cling-promo>p strong{color:#f1d39c}
+.cling-try-note{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"tag title" "tag sub";gap:2px 9px;align-items:center;margin:12px 0;padding:11px 12px;border:1px solid #6f5632;border-radius:12px;background:#21180f}
+.cling-try-note>span{grid-area:tag;padding:6px 7px;border-radius:8px;background:#f0c77d;color:#26190b;font-size:9px;font-weight:1000}
+.cling-try-note>b{grid-area:title;font-size:11px}
+.cling-try-note>small{grid-area:sub;color:var(--muted);font-size:9px;line-height:1.4}
