@@ -317,3 +317,26 @@ body.alarm-ringing{overflow:hidden;touch-action:none}
 .order-success-mark{width:64px;height:64px;margin:0 auto 12px;border-radius:50%;display:grid;place-items:center;background:#315f42;color:#baf0ca;font-size:34px;font-weight:900}
 .order-success h3{margin:4px 0 10px}
 .order-success p{margin:6px 0}
+
+.seat-running-total{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0;padding:13px 14px;border:1px solid #6a4a24;border-radius:13px;background:#2a1f13}
+.seat-running-total span{font-size:12px;color:var(--muted)}
+.seat-running-total strong{font-size:20px;color:var(--accent2)}
+.seat-history-section{margin-top:16px}
+.seat-history-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.seat-history-title strong{font-size:13px}
+.seat-history-title span{font-size:10px;color:var(--muted)}
+.seat-order-history{margin-bottom:10px;padding:13px;border:1px solid #3b3026;border-radius:14px;background:#181410}
+.seat-order-history.latest-order{border-color:#7b5a2e;background:#21180f}
+.seat-order-history-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.seat-order-history-head small{display:block;margin-top:3px;color:var(--muted);font-size:9px}
+.seat-order-time{font-size:13px;font-weight:900}
+.latest-badge{display:inline-block;margin-left:5px;padding:3px 6px;border-radius:999px;background:var(--accent);color:#25180b;font-size:8px;vertical-align:1px}
+.paid-history{margin-top:22px;padding-top:16px;border-top:1px solid #342b22}
+.paid-history .seat-order-history{opacity:.78}
+@media(max-width:560px){
+  .seat-detail{padding:14px}
+  .seat-order-history{padding:12px}
+  .seat-order-history .status-row{display:grid;grid-template-columns:1fr 1fr}
+  .seat-order-history .status-btn{min-height:42px}
+  .seat-running-total{position:sticky;top:8px;z-index:5;box-shadow:0 8px 20px rgba(0,0,0,.28)}
+}
