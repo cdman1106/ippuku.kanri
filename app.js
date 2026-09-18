@@ -14,7 +14,7 @@
     {product:'キャラメルマキアート',tag:'甘めが好きな方へ',headline:'少し贅沢な一杯を。',copy:'ゆっくり過ごしたい時におすすめのカフェメニューです。',active:true}
   ]);
   var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', inventoryShopFilter='all', customerSeat=new URLSearchParams(location.search).get('seat')||load('ippukuCustomerSeat','')||'';
-  var seatAccess={}, customerSeatOpen=true, customerSeatTimer=null;
+  var seatAccess={}, seatAccessMeta={}, customerSeatOpen=true, customerDrinkSatisfied=false, customerSeatTimer=null;
   var INVENTORY_SEED_VERSION=4;
   var INVENTORY_SEED=[
     {name:'ガムシロップ',stock:'',min:6,unit:'個',source:'スタンバイ'},
@@ -301,6 +301,7 @@
     var result=await apiRequest('/api/seats');
     if(result.ok&&result.data&&result.data.seats){
       seatAccess=result.data.seats;
+      seatAccessMeta=result.data.details||{};
       renderSeats();
       if(selectedSeat)renderSeatDetail(selectedSeat);
     }
@@ -320,6 +321,7 @@
       return;
     }
     seatAccess[seat]=open;
+    seatAccessMeta[seat]={open:open,updatedAt:result.data&&result.data.updatedAt?result.data.updatedAt:new Date().toISOString()};
     renderSeats();
     renderSeatDetail(seat);
   }
@@ -330,6 +332,7 @@
     if(!result.ok)return true;
     var wasOpen=customerSeatOpen;
     customerSeatOpen=result.data.open!==false;
+    customerDrinkSatisfied=result.data.drinkOrdered===true;
     var note=$('#seatClosedNotice');
     if(note)note.style.display=customerSeatOpen?'none':'block';
     var checkout=$('#checkoutBtn');
@@ -381,13 +384,42 @@
   }
 
   function latest(seat){return orders.filter(function(o){return o.seat===seat&&o.status!=='paid'}).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)})[0]}
+
+  function noOrderInfo(seat){
+    var meta=seatAccessMeta[seat];
+    if(!meta||meta.open===false||!meta.updatedAt)return null;
+    var started=new Date(meta.updatedAt).getTime();
+    if(!isFinite(started))return null;
+    var hasOrder=orders.some(function(o){return o.seat===seat&&new Date(o.createdAt).getTime()>=started});
+    if(hasOrder)return null;
+    var mins=Math.floor((Date.now()-started)/60000);
+    return mins>=10?{minutes:mins}:null;
+  }
+
+  function renderNoOrderAlerts(){
+    var box=$('#noOrderAlertList');if(!box)return;
+    var alerts=SEATS.map(function(seat){var info=noOrderInfo(seat);return info?{seat:seat,minutes:info.minutes}:null}).filter(Boolean);
+    if(!alerts.length){box.style.display='none';box.innerHTML='';return}
+    box.style.display='block';
+    box.innerHTML='<div class="no-order-alert-title"><strong>⚠ ワンドリンク未注文</strong><span>着席から10分以上</span></div>'+
+      '<div class="no-order-alert-seats">'+alerts.map(function(x){return '<button data-no-order-seat="'+esc(x.seat)+'">'+esc(x.seat)+' <small>'+x.minutes+'分</small></button>'}).join('')+'</div>'+
+      '<p>注文が入っていない席です。ワンドリンクのご案内をしてください。</p>';
+    $$('[data-no-order-seat]').forEach(function(b){
+      b.onclick=function(){
+        selectedSeat=b.dataset.noOrderSeat;renderSeats();
+        var d=$('#seatDetail');if(d)d.scrollIntoView({behavior:'smooth',block:'start'});
+      };
+    });
+  }
+
   function renderSeats(){
     $$('.seat').forEach(function(b){
-      var seat=b.dataset.seat,o=latest(seat),isOpen=seatAccess[seat]!==false;
-      b.dataset.status=isOpen?(o?o.status:'free'):'closed';
+      var seat=b.dataset.seat,o=latest(seat),isOpen=seatAccess[seat]!==false,wait=noOrderInfo(seat);
+      b.dataset.status=!isOpen?'closed':(wait?'noorder':(o?o.status:'free'));
       b.classList.toggle('selected',selectedSeat===seat);
-      b.innerHTML=esc(seat)+(!isOpen?'<br><small>注文停止</small>':(o?'<br><small>'+LABEL[o.status]+'</small>':''));
+      b.innerHTML=esc(seat)+(!isOpen?'<br><small>注文停止</small>':(wait?'<br><small>⚠ 未注文 '+wait.minutes+'分</small>':(o?'<br><small>'+LABEL[o.status]+'</small>':'')));
     });
+    renderNoOrderAlerts();
     if(selectedSeat) renderSeatDetail(selectedSeat);
   }
   $$('.seat').forEach(function(b){b.onclick=function(){selectedSeat=b.dataset.seat;renderSeats()}});
@@ -403,7 +435,7 @@
     if(!seatOrders.length){
       var isOpen=seatAccess[seat]!==false;
       box.innerHTML='<div class="detail-head"><h3>'+esc(seat)+'</h3><span class="status-chip '+(isOpen?'':'closed')+'">'+(isOpen?'空席・受付中':'注文停止中')+'</span></div>'+
-        '<div class="seat-access-control '+(isOpen?'open':'closed')+'"><div><strong>'+(isOpen?'この席は注文受付中':'この席は注文停止中')+'</strong><span>'+(isOpen?'退店したら停止してください。':'次のお客様が着席したら受付を開始してください。')+'</span></div><button class="'+(isOpen?'danger-btn':'primary-btn')+'" id="toggleSeatAccess">'+(isOpen?'退店・注文を停止':'注文受付を開始')+'</button></div>'+
+        '<div class="seat-access-control '+(isOpen?'open':'closed')+'"><div><strong>'+(isOpen?'この席は注文受付中':'この席は注文停止中')+'</strong><span>'+(isOpen?'退店したら停止してください。':'次のお客様が着席したら「着席・注文受付開始」を押してください。')+'</span></div><button class="'+(isOpen?'danger-btn':'primary-btn')+'" id="toggleSeatAccess">'+(isOpen?'退店・注文を停止':'着席・注文受付開始')+'</button></div>'+
         '<div class="empty-detail"><strong>注文はありません</strong><span>この席の注文が入ると、ここに履歴として残ります。</span><button class="primary-btn" id="seatDemo">この席にデモ注文</button></div>';
       $('#toggleSeatAccess').onclick=function(){setSeatOpen(seat,!isOpen)};
       $('#seatDemo').onclick=function(){demo(seat)};
@@ -428,7 +460,7 @@
 
     box.innerHTML=
       '<div class="detail-head"><div><h3>'+esc(seat)+'</h3><span class="detail-meta">現在の注文 '+activeOrders.length+'件</span></div><span class="status-chip '+(isOpen?(activeOrders[0]?activeOrders[0].status:'paid'):'closed')+'">'+(isOpen?(activeOrders.length?'注文あり':'注文受付中'):'注文停止中')+'</span></div>'+
-      '<div class="seat-access-control '+(isOpen?'open':'closed')+'"><div><strong>'+(isOpen?'この席は注文受付中':'この席は注文停止中')+'</strong><span>'+(isOpen?'退店したら停止してください。停止後はお客様のスマホから注文できません。':'次のお客様が着席したら受付を開始してください。')+'</span></div><button class="'+(isOpen?'danger-btn':'primary-btn')+'" id="toggleSeatAccess">'+(isOpen?'退店・注文を停止':'注文受付を開始')+'</button></div>'+
+      '<div class="seat-access-control '+(isOpen?'open':'closed')+'"><div><strong>'+(isOpen?'この席は注文受付中':'この席は注文停止中')+'</strong><span>'+(isOpen?'退店したら停止してください。停止後はお客様のスマホから注文できません。':'次のお客様が着席したら「着席・注文受付開始」を押してください。')+'</span></div><button class="'+(isOpen?'danger-btn':'primary-btn')+'" id="toggleSeatAccess">'+(isOpen?'退店・注文を停止':'着席・注文受付開始')+'</button></div>'+
       (activeOrders.length?'<div class="seat-running-total"><span>現在の席合計</span><strong>'+yen(activeTotal)+'</strong></div>':'')+
       '<div class="seat-history-section"><div class="seat-history-title"><strong>現在の注文</strong><span>'+activeOrders.length+'件</span></div>'+
       (activeOrders.length?activeOrders.map(function(o,i){return seatOrderBlock(o,i,false)}).join(''):'<p class="note">未会計の注文はありません。</p>')+
