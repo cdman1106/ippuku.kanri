@@ -999,7 +999,7 @@
       }
       $('#modal').innerHTML='<h3>注文内容</h3><div class="cart-edit-list">'+cart.map(function(i,idx){return '<div class="cart-edit-row"><div class="cart-edit-info"><b>'+esc(i.displayName||i.name)+'</b><small>'+yen(i.price)+' / 1点</small></div><div class="cart-qty"><button class="qty-btn" data-cart-dec="'+idx+'">−</button><strong>'+i.qty+'</strong><button class="qty-btn" data-cart-inc="'+idx+'">＋</button></div><div class="cart-line-total">'+yen(i.price*i.qty)+'</div><button class="cart-remove" data-cart-remove="'+idx+'">削除</button></div>'}).join('')+'</div>'+upsellHtml+
         '<div class="checkout-totals"><div><span>商品小計</span><strong>'+yen(amounts.subtotal)+'</strong></div>'+
-        (amounts.nightFee?'<div class="night-fee-line"><span>深夜料金（金・土 21時以降 10%）</span><strong>＋'+yen(amounts.nightFee)+'</strong></div>':'<div class="night-fee-info">金・土の21:00〜翌1:00は深夜料金10%が加算されます。ZIPPOガチャ・Clingガチャは対象外です。</div>')+
+        (amounts.nightFee?'<div class="night-fee-line"><span>深夜料金 10%</span><strong>＋'+yen(amounts.nightFee)+'</strong></div>':'')+
         '<div class="detail-total"><span>合計</span><strong>'+yen(amounts.total)+'</strong></div></div>'+
         '<div class="form-row"><label>スタッフへのメモ</label><input id="orderNote" placeholder="例：氷少なめ"></div><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="primary-btn" id="submitOrder">注文する</button></div>';
       $$('[data-close]').forEach(function(b){b.onclick=closeModal});
