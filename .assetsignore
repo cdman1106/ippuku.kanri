@@ -1,0 +1,8 @@
+.git/
+.github/
+node_modules/
+migrations/
+worker.js
+wrangler.jsonc
+README.md
+.assetsignore
