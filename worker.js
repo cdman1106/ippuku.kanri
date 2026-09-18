@@ -46,6 +46,50 @@ function normalizeItem(item) {
   };
 }
 
+async function ensureSeatAccessTable(env) {
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS seat_access (seat TEXT PRIMARY KEY, is_open INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL)"
+  ).run();
+}
+
+async function getSeatAccess(env, seat) {
+  await ensureSeatAccessTable(env);
+  const row = await env.DB.prepare(
+    "SELECT is_open, updated_at FROM seat_access WHERE seat = ?"
+  ).bind(seat).first();
+  return {
+    seat,
+    open: row ? Number(row.is_open) === 1 : true,
+    updatedAt: row?.updated_at || null
+  };
+}
+
+async function listSeatAccess(env) {
+  await ensureSeatAccessTable(env);
+  const result = await env.DB.prepare(
+    "SELECT seat, is_open, updated_at FROM seat_access"
+  ).all();
+  const rows = result.results || [];
+  const bySeat = {};
+  for (const seat of SEATS) bySeat[seat] = true;
+  for (const row of rows) bySeat[row.seat] = Number(row.is_open) === 1;
+  return bySeat;
+}
+
+async function setSeatAccess(request, env, seat) {
+  if (!SEATS.has(seat)) return json({ ok: false, error: "INVALID_SEAT" }, 400);
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body.open !== "boolean") {
+    return json({ ok: false, error: "INVALID_BODY" }, 400);
+  }
+  await ensureSeatAccessTable(env);
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO seat_access (seat, is_open, updated_at) VALUES (?, ?, ?) ON CONFLICT(seat) DO UPDATE SET is_open = excluded.is_open, updated_at = excluded.updated_at"
+  ).bind(seat, body.open ? 1 : 0, now).run();
+  return json({ ok: true, seat, open: body.open, updatedAt: now });
+}
+
 async function getOrder(env, id) {
   const row = await env.DB.prepare(
     "SELECT id, seat, status, total, note, created_at, updated_at FROM orders WHERE id = ?"
@@ -139,6 +183,9 @@ async function createOrder(request, env) {
   const seat = String(body.seat || "");
   if (!SEATS.has(seat)) return json({ ok: false, error: "INVALID_SEAT" }, 400);
 
+  const access = await getSeatAccess(env, seat);
+  if (!access.open) return json({ ok: false, error: "SEAT_CLOSED" }, 403);
+
   const items = Array.isArray(body.items)
     ? body.items.map(normalizeItem).filter((x) => x.name && x.category !== "Fee")
     : [];
@@ -214,6 +261,20 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/health" && request.method === "GET") {
     return json({ ok: true, database: true });
   }
+  if (url.pathname === "/api/seats" && request.method === "GET") {
+    return json({ ok: true, seats: await listSeatAccess(env) });
+  }
+
+  const seatMatch = url.pathname.match(/^\/api\/seats\/([^/]+)$/);
+  if (seatMatch && request.method === "GET") {
+    const seat = decodeURIComponent(seatMatch[1]);
+    if (!SEATS.has(seat)) return json({ ok: false, error: "INVALID_SEAT" }, 400);
+    return json({ ok: true, ...(await getSeatAccess(env, seat)) });
+  }
+  if (seatMatch && request.method === "PATCH") {
+    return setSeatAccess(request, env, decodeURIComponent(seatMatch[1]));
+  }
+
   if (url.pathname === "/api/orders" && request.method === "GET") {
     return listOrders(request, env);
   }
