@@ -480,3 +480,80 @@ body.customer-mode .detail-total{color:#221b16}
 .checkout-upsell-grid span b,.checkout-upsell-grid span small{display:block}
 .checkout-upsell-grid span b{font-size:12px}.checkout-upsell-grid span small{font-size:10px;color:#8b6c4a;margin-top:3px}
 .checkout-upsell-grid i{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#2f241b;color:#fff;font-style:normal;font-weight:900}
+
+
+/* Unified white theme */
+:root{
+  --bg:#ffffff;
+  --panel:#ffffff;
+  --panel2:#f8f8f8;
+  --line:#e5e1dc;
+  --text:#241f1b;
+  --muted:#756b63;
+  --accent:#b98945;
+  --accent2:#8a6332;
+  --shadow:0 8px 24px rgba(45,35,27,.08)
+}
+body{background:#fff;color:var(--text)}
+.topbar{background:rgba(255,255,255,.96);border-bottom-color:#e9e5e0;color:#241f1b}
+.eyebrow{color:#8a6332}
+.ghost,.icon-btn{background:#fff;color:#241f1b;border-color:#ddd6cf}
+.text-btn{color:#755126}
+.primary-btn,.upload-btn{background:#2f2924;color:#fff}
+.metric,.metric.primary,.quick,.panel,.seat-detail,.order-card,.inventory-card,.reserve-card,.setting-card{
+  background:#fff;
+  border-color:#e8e3de;
+  color:#241f1b;
+  box-shadow:0 6px 20px rgba(45,35,27,.06)
+}
+.metric.primary{background:#fff;border-color:#d9c6aa}
+.badge{background:#f5efe7;color:#755126}
+.rank-row,.order-line,th,td{border-bottom-color:#ece8e4}
+.focus-item{background:#fff;border-color:#e6e0da}
+.bottom-nav{background:rgba(255,255,255,.97);border-color:#e4ded8;box-shadow:0 10px 30px rgba(45,35,27,.12)}
+.nav-item{color:#766c64}
+.nav-item.active{background:#f1ece7;color:#2f2924}
+.floorplan{background:#fff;border-color:#ddd4cb;box-shadow:inset 0 0 30px rgba(72,53,38,.04)}
+.counter-top{border-bottom-color:#c9b69e;color:#745d45}
+.counter-left{border-right-color:#c9b69e;color:#745d45}
+.table-box{background:#f5efe8;border-color:#cdbca9;color:#3b3028}
+.table-box small{color:#7a695b}
+.entrance{border-color:#cfc6bd;color:#766c64}
+.seat{background:#fff;color:#3a312a;border-color:#bfb5ab;box-shadow:0 6px 14px rgba(45,35,27,.09)}
+.seat.selected{outline-color:#342b24}
+.status-btn,.filter{background:#fff;color:#5f554d;border-color:#ddd6cf}
+.status-btn.active,.filter.active{background:#2f2924;color:#fff;border-color:#2f2924}
+.search,.stock-input,.form-row input,.form-row select{background:#fff;color:#241f1b;border-color:#dcd5ce}
+.bar-track{background:#eee9e4}
+.placeholder-panel{background:#fff}
+.qr-link{background:#fff;border-color:#e4ddd6}
+.modal{background:#fff;color:#241f1b;border-color:#ded7d0}
+.strategy-panel{background:#fff;border-color:#e5ddd5;box-shadow:0 6px 20px rgba(45,35,27,.06)}
+.strategy-summary>div,.strategy-card,.promo-manage-row,.promo-suggest{background:#fff;border-color:#e6dfd8}
+.strategy-icon{background:#f4eee7;color:#755126}
+.strategy-card li{border-top-color:#ece6e0}
+.customer-promo{background:#fff;border-color:#e7dfd7;box-shadow:0 6px 20px rgba(45,35,27,.06)}
+.promo-card{background:#fff;border-color:#e6dfd7;color:#241f1b}
+.promo-card:after{color:rgba(30,24,20,.035)}
+.promo-copy p{color:#756a61}
+.promo-tag{background:#efe4d5;color:#5c4022}
+.promo-product strong{color:#755126}
+.promo-add{background:#2f2924;color:#fff}
+.one-drink-note{background:#fff;border-color:#e5ddd5;color:#3b322b}
+.one-drink-note strong{color:#755126}
+.checkout-guide,.night-charge-note{background:#fff;border-color:#e5ddd5;color:#4a4038}
+.customer-head{background:rgba(255,255,255,.97);border-bottom-color:#e8e3de;color:#241f1b}
+.customer-category-filters{background:linear-gradient(180deg,rgba(255,255,255,.99) 72%,rgba(255,255,255,.94))}
+.customer-filter{background:#fff;color:#5f554d;border-color:#ddd6cf}
+.customer-filter.active{background:#2f2924;border-color:#2f2924;color:#fff}
+.menu-card{background:#fff;border-color:#e8e3de;color:#241f1b;box-shadow:0 5px 18px rgba(45,35,27,.06)}
+.menu-card-tap{color:#241f1b}
+.menu-card-tap:active,.menu-card-tap.just-added{background:#f7f4f1}
+.menu-photo-wrap{background:#f5f2ef}
+.add-btn{background:#2f2924;color:#fff}
+.cart-bar{background:rgba(255,255,255,.98);border-color:#dfd8d1;color:#241f1b;box-shadow:0 -8px 24px rgba(45,35,27,.08)}
+.cart-edit-row{background:#fff;border-color:#e5ded7}
+.qty-btn{background:#fff;color:#2f2924;border-color:#d9d1ca}
+.choice-btn{background:#fff!important;color:#2f2924!important;border-color:#ddd5cd!important}
+.no-order-alert-list{background:#fff7f5;color:#6c2e27}
+.drink-upsell-banner,.checkout-upsell{background:#fffaf2}
