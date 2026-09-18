@@ -503,6 +503,83 @@
       };
     });
   }
+  function buildInventoryLineText(){
+    var low=inventory.filter(function(x){
+      var has=x.stock!==''&&x.stock!==null&&x.stock!==undefined&&!isNaN(Number(x.stock));
+      return has&&Number(x.stock)<=Number(x.min||0);
+    });
+    var now=new Date();
+    var date=(now.getMonth()+1)+'/'+now.getDate();
+    var lines=['【いっぷく 在庫連絡 '+date+'】'];
+
+    function addGroup(title,list){
+      if(!list.length)return;
+      lines.push('', '▼'+title);
+      list.forEach(function(x){
+        lines.push('・'+x.name+'　現在 '+Number(x.stock)+x.unit+' / 基準 '+x.min+x.unit);
+      });
+    }
+
+    var refill=low.filter(function(x){return String(x.source||'').indexOf('スタンバイ')===0});
+    var buy=low.filter(function(x){return String(x.source||'').indexOf('スタンバイ')!==0});
+    addGroup('買出しが必要',buy);
+    addGroup('店内補充が必要',refill);
+
+    if(!low.length){
+      lines.push('', '現在、基準以下の在庫はありません。');
+    }
+    return lines.join('\n');
+  }
+
+  async function copyTextToClipboard(text){
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    }catch(e){}
+    try{
+      var ta=document.createElement('textarea');
+      ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+      document.body.appendChild(ta);ta.focus();ta.select();
+      var ok=document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    }catch(e){return false}
+  }
+
+  function openInventoryLineCopy(){
+    var text=buildInventoryLineText();
+    showModal(
+      '<h3>LINE用 在庫リスト</h3>'+
+      '<p class="note">現在庫が基準以下のものだけをまとめています。未入力の商品は含みません。</p>'+
+      '<textarea id="inventoryLineText" class="line-copy-text" readonly>'+esc(text)+'</textarea>'+
+      '<div class="modal-actions"><button class="ghost" data-close>閉じる</button><button class="ghost" id="shareInventoryLine">共有</button><button class="primary-btn" id="copyInventoryLine">まとめてコピー</button></div>',
+      function(){
+        $('#copyInventoryLine').onclick=async function(){
+          var txt=$('#inventoryLineText').value;
+          var ok=await copyTextToClipboard(txt);
+          if(ok){
+            this.textContent='コピーしました ✓';
+            var b=this;setTimeout(function(){b.textContent='まとめてコピー'},1200);
+          }else{
+            $('#inventoryLineText').focus();$('#inventoryLineText').select();
+            alert('自動コピーできなかったので、表示された文章を長押ししてコピーしてください。');
+          }
+        };
+        $('#shareInventoryLine').onclick=async function(){
+          var txt=$('#inventoryLineText').value;
+          if(navigator.share){
+            try{await navigator.share({text:txt});return}catch(e){if(e&&e.name==='AbortError')return}
+          }
+          var ok=await copyTextToClipboard(txt);
+          alert(ok?'共有機能が使えないためコピーしました。LINEに貼り付けてください。':'文章を長押ししてコピーしてください。');
+        };
+      }
+    );
+  }
+  $('#inventoryLineBtn').onclick=openInventoryLineCopy;
+
   $('#addInventoryBtn').onclick=function(){showModal('<h3>在庫商品を追加</h3><div class="form-row"><label>商品名</label><input id="invName"></div><div class="form-row"><label>現在庫</label><input id="invStock" type="number" value="0"></div><div class="form-row"><label>最低在庫</label><input id="invMin" type="number" value="0"></div><div class="form-row"><label>単位</label><input id="invUnit" value="個"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="saveInv">追加</button></div>',function(){$('#saveInv').onclick=function(){inventory.push({name:$('#invName').value||'未設定',stock:Number($('#invStock').value),min:Number($('#invMin').value),unit:$('#invUnit').value||'個'});save('ippukuInventory',inventory);closeModal();renderInventory()}})};
   function renderReserves(){$('#reserveList').innerHTML=reserves.length?reserves.map(function(r,i){return '<div class="reserve-card"><div><b>'+esc(r.item)+' ×'+r.qty+'</b><small>'+esc(r.name||'お客様')+' / 来店 '+esc(r.date)+' '+esc(r.time||'')+'</small></div><span class="status waiting">'+esc(r.date)+'</span><button class="ghost" data-del-res="'+i+'">完了</button></div>'}).join(''):'<div class="panel note">取り置きはありません。</div>';$$('[data-del-res]').forEach(function(b){b.onclick=function(){reserves.splice(Number(b.dataset.delRes),1);save('ippukuReserves',reserves);renderAll()}})}
   $('#addReserveBtn').onclick=function(){showModal('<h3>取り置き追加</h3><div class="form-row"><label>お客様名</label><input id="resName"></div><div class="form-row"><label>商品・銘柄</label><input id="resItem"></div><div class="form-row"><label>個数</label><input id="resQty" type="number" value="1"></div><div class="form-row"><label>来店日</label><input id="resDate" type="date"></div><div class="form-row"><label>時間</label><input id="resTime" type="time"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="saveRes">追加</button></div>',function(){$('#saveRes').onclick=function(){reserves.push({name:$('#resName').value,item:$('#resItem').value||'未設定',qty:Number($('#resQty').value)||1,date:$('#resDate').value,time:$('#resTime').value});save('ippukuReserves',reserves);closeModal();renderAll()}})};
