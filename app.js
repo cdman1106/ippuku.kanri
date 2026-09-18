@@ -5,7 +5,7 @@
   var TABLES={T1:['T1-01','T1-02','T1-03','T1-04'],T2:['T2-01','T2-02'],T3:['T3-01','T3-02']};
   var LABEL={ordered:'受付',preparing:'準備中',served:'提供済',paid:'会計済'};
   function load(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
-  function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+  function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]})}
   function time(v){var d=new Date(v);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
   var sales=load('ippukuSales',window.SALES_DATA||[]), orders=load('ippukuOrders',[]), inventory=load('ippukuInventory',[]), reserves=load('ippukuReserves',[]);
@@ -13,7 +13,7 @@
     {product:'コーヒー',tag:'いっぷくおすすめ',headline:'まずは、ほっと一杯。',copy:'喫煙時間のお供に。ゆっくり過ごしたい時の定番です。',active:true},
     {product:'キャラメルマキアート',tag:'甘めが好きな方へ',headline:'少し贅沢な一杯を。',copy:'ゆっくり過ごしたい時におすすめのカフェメニューです。',active:true}
   ]);
-  var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', customerSeat=new URLSearchParams(location.search).get('seat')||localStorage.getItem('ippukuCustomerSeat')||'';
+  var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', customerSeat=new URLSearchParams(location.search).get('seat')||load('ippukuCustomerSeat','')||'';
   var seatAccess={}, customerSeatOpen=true, customerSeatTimer=null;
   if(!inventory.length) inventory=[{name:'コーヒー豆',stock:4,min:2,unit:'袋'},{name:'ホットサンド用パン',stock:18,min:10,unit:'枚'},{name:'紙コップ',stock:52,min:30,unit:'個'}];
 
@@ -142,6 +142,7 @@
       if(!serverSyncTimer)serverSyncTimer=setInterval(function(){syncOrdersFromServer(false)},2000);
       if(document.body.classList.contains('customer-mode'))startCustomerSeatWatch();
     }
+    return backendReady;
   }
 
   async function setOrderStatus(order,status){
@@ -474,7 +475,7 @@
     });
   }
 
-  function renderCustomer(){if(!customerSeat){showModal('<h3>席番号を選択</h3><div class="form-row"><select id="seatSelect">'+SEATS.map(function(s){return '<option>'+s+'</option>'}).join('')+'</select></div><div class="modal-actions"><button class="primary-btn" id="seatChoose">この席で注文</button></div>',function(){$('#seatChoose').onclick=function(){customerSeat=$('#seatSelect').value;localStorage.setItem('ippukuCustomerSeat',customerSeat);closeModal();renderCustomer()}})}$('#customerSeat').textContent=customerSeat||'未選択';renderCustomerMenu();try{renderCustomerPromos()}catch(e){console.error('promo render failed',e)}renderCart()}
+  function renderCustomer(){if(!customerSeat){showModal('<h3>席番号を選択</h3><div class="form-row"><select id="seatSelect">'+SEATS.map(function(s){return '<option>'+s+'</option>'}).join('')+'</select></div><div class="modal-actions"><button class="primary-btn" id="seatChoose">この席で注文</button></div>',function(){$('#seatChoose').onclick=function(){customerSeat=$('#seatSelect').value;save('ippukuCustomerSeat',customerSeat);closeModal();renderCustomer()}})}$('#customerSeat').textContent=customerSeat||'未選択';renderCustomerMenu();try{renderCustomerPromos()}catch(e){console.error('promo render failed',e)}renderCart()}
   function menuMeta(x){
     var parts=[];
     if(x.badges&&x.badges.length)parts.push(x.badges.join(' / '));
@@ -610,38 +611,25 @@
             note:noteEl?noteEl.value:''
           };
           var newOrder;
-          if(backendReady){
-            var result=await apiRequest('/api/orders',{
-              method:'POST',
-              body:JSON.stringify(payload)
-            });
-            if(result.status===403&&result.data&&result.data.error==='SEAT_CLOSED'){
-              customerSeatOpen=false;
-              refreshCustomerSeatAccess(false);
-              throw new Error('SEAT_CLOSED');
-            }
-            if(!result.ok||!result.data||!result.data.order)throw new Error('SERVER_ORDER_FAILED');
-            newOrder=result.data.order;
-            orders=[newOrder].concat(orders.filter(function(x){return String(x.id)!==String(newOrder.id)}));
-            save('ippukuOrders',orders);
-          }else{
-            var localItems=payload.items.slice();
-            if(amounts.nightFee){
-              localItems.push({name:'深夜料金',displayName:'深夜料金（金・土 21時以降10%）',category:'Fee',price:amounts.nightFee,qty:1,option:''});
-            }
-            newOrder={
-              id:String(Date.now()),
-              seat:customerSeat,
-              status:'ordered',
-              items:localItems,
-              total:t,
-              createdAt:new Date().toISOString(),
-              note:payload.note
-            };
-            orders.push(newOrder);
-            save('ippukuOrders',orders);
-            signalNewOrderSafely(newOrder);
+          if(!backendReady){
+            await detectBackend();
           }
+          if(!backendReady){
+            throw new Error('BACKEND_OFFLINE');
+          }
+          var result=await apiRequest('/api/orders',{
+            method:'POST',
+            body:JSON.stringify(payload)
+          });
+          if(result.status===403&&result.data&&result.data.error==='SEAT_CLOSED'){
+            customerSeatOpen=false;
+            refreshCustomerSeatAccess(false);
+            throw new Error('SEAT_CLOSED');
+          }
+          if(!result.ok||!result.data||!result.data.order)throw new Error('SERVER_ORDER_FAILED');
+          newOrder=result.data.order;
+          orders=[newOrder].concat(orders.filter(function(x){return String(x.id)!==String(newOrder.id)}));
+          save('ippukuOrders',orders);
           cart=[];
           renderCart();
           closeModal();
@@ -655,8 +643,10 @@
           if(e&&e.message==='SEAT_CLOSED'){
             closeModal();
             alert('この席の注文受付は終了しました。スタッフへお声がけください。');
+          }else if(e&&e.message==='BACKEND_OFFLINE'){
+            alert('現在、注文サーバーに接続できません。注文は送信されていません。スタッフへお声がけください。');
           }else{
-            alert('注文処理でエラーが発生しました。もう一度お試しください。');
+            alert('注文を送信できませんでした。注文は確定していません。スタッフへお声がけください。');
           }
         }
       };
