@@ -44,9 +44,28 @@
   $$('.seat').forEach(function(b){b.onclick=function(){selectedSeat=b.dataset.seat;renderSeats()}});
   $$('.table-box').forEach(function(b){b.onclick=function(){var ss=TABLES[b.dataset.table], os=orders.filter(function(o){return ss.indexOf(o.seat)>=0&&o.status!=='paid'});showModal('<h3>'+b.dataset.table+' テーブル</h3>'+(os.length?os.map(orderHtml).join(''):'<p class="note">現在の注文はありません。</p>')+'<div class="modal-actions"><button class="ghost" data-close>閉じる</button></div>')}});
   function renderSeatDetail(seat){var o=latest(seat), box=$('#seatDetail'); if(!o){box.innerHTML='<div class="detail-head"><h3>'+seat+'</h3><span class="status-chip">空席</span></div><div class="empty-detail"><strong>注文はありません</strong><button class="primary-btn" id="seatDemo">この席にデモ注文</button></div>';$('#seatDemo').onclick=function(){demo(seat)};return} box.innerHTML='<div class="detail-head"><div><h3>'+seat+'</h3><span class="detail-meta">'+time(o.createdAt)+' 注文</span></div><span class="status-chip '+o.status+'">'+LABEL[o.status]+'</span></div><div class="order-items">'+o.items.map(function(i){return '<div class="order-line"><span>'+esc(i.displayName||i.name)+' ×'+i.qty+'</span><strong>'+yen(i.price*i.qty)+'</strong></div>'}).join('')+'</div><div class="detail-total"><span>合計</span><strong>'+yen(o.total)+'</strong></div><p class="note">'+(o.note?'メモ：'+esc(o.note):'メモなし')+'</p><div class="status-row">'+['ordered','preparing','served','paid'].map(function(s){return '<button class="status-btn '+(o.status===s?'active':'')+'" data-set-status="'+s+'">'+LABEL[s]+'</button>'}).join('')+'</div>'; $$('[data-set-status]').forEach(function(b){b.onclick=function(){o.status=b.dataset.setStatus;save('ippukuOrders',orders);renderAll()}})}
-  function orderHtml(o){return '<div class="order-card"><div class="order-seat">'+esc(o.seat)+'</div><div><b>'+o.items.map(function(i){return esc(i.displayName||i.name)+' ×'+i.qty}).join('、')+'</b><p>'+time(o.createdAt)+' ・ '+o.items.reduce(function(a,i){return a+i.qty},0)+'点 ・ '+yen(o.total)+'</p></div><span class="status-chip '+o.status+'">'+LABEL[o.status]+'</span></div>'}
-  function renderOrders(){var l=orders.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});if(orderFilter!=='all')l=l.filter(function(o){return o.status===orderFilter});$('#ordersList').innerHTML=l.length?l.map(orderHtml).join(''):'<div class="panel note">注文はまだありません。</div>'}
+  function orderHtml(o){return '<div class="order-card"><div class="order-seat">'+esc(o.seat)+'</div><div><b>'+o.items.map(function(i){return esc(i.displayName||i.name)+' ×'+i.qty}).join('、')+'</b><p>'+time(o.createdAt)+' ・ '+o.items.reduce(function(a,i){return a+i.qty},0)+'点 ・ '+yen(o.total)+'</p></div><div class="order-card-actions"><span class="status-chip '+o.status+'">'+LABEL[o.status]+'</span><button class="danger-link" data-delete-order="'+esc(o.id)+'">削除</button></div></div>'}
+  function renderOrders(){var l=orders.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});if(orderFilter!=='all')l=l.filter(function(o){return o.status===orderFilter});$('#ordersList').innerHTML=l.length?l.map(orderHtml).join(''):'<div class="panel note">注文はまだありません。</div>';bindOrderDeleteButtons()}
   $$('[data-order-filter]').forEach(function(b){b.onclick=function(){orderFilter=b.dataset.orderFilter;$$('[data-order-filter]').forEach(function(x){x.classList.toggle('active',x===b)});renderOrders()}}); $('#demoOrderBtn').onclick=function(){demo(SEATS[Math.floor(Math.random()*SEATS.length)])};
+  function deleteOrderById(id){
+    var o=orders.find(function(x){return String(x.id)===String(id)});
+    if(!o)return;
+    showModal('<h3>注文を削除しますか？</h3><p class="note">席 '+esc(o.seat)+' / '+o.items.map(function(i){return esc(i.displayName||i.name)+' ×'+i.qty}).join('、')+'</p><p class="delete-warning">この操作は取り消せません。</p><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="danger-btn" id="confirmDeleteOrder">削除する</button></div>',function(){
+      $('#confirmDeleteOrder').onclick=function(){
+        orders=orders.filter(function(x){return String(x.id)!==String(id)});
+        save('ippukuOrders',orders);
+        closeModal();
+        renderAll();
+        if(selectedSeat)renderSeats();
+      };
+    });
+  }
+  function bindOrderDeleteButtons(){
+    $('[data-delete-order]').forEach(function(b){
+      b.onclick=function(e){e.stopPropagation();deleteOrderById(b.dataset.deleteOrder)};
+    });
+  }
+
   function demo(seat){var m=(window.MENU_DATA||[]).slice(0,8);if(!m.length)return;var p=[m[Math.floor(Math.random()*m.length)],m[Math.floor(Math.random()*m.length)]],items=p.map(function(x){return {name:x.name,price:x.price,qty:1}});orders.push({id:String(Date.now()),seat:seat,status:'ordered',items:items,total:items.reduce(function(a,i){return a+i.price*i.qty},0),createdAt:new Date().toISOString(),note:''});save('ippukuOrders',orders);selectedSeat=seat;renderAll()}
 
 
@@ -226,7 +245,25 @@
   }
 
   function renderCart(){var q=cart.reduce(function(a,i){return a+i.qty},0),t=cart.reduce(function(a,i){return a+i.price*i.qty},0);$('#cartSummary').textContent=q+'点 / '+yen(t)}
-  $('#checkoutBtn').onclick=function(){if(!cart.length){alert('商品を選んでください');return}showModal('<h3>注文内容</h3>'+cart.map(function(i){return '<div class="order-line"><span>'+esc(i.displayName||i.name)+' ×'+i.qty+'</span><b>'+yen(i.price*i.qty)+'</b></div>'}).join('')+'<div class="detail-total"><span>合計</span><strong>'+yen(cart.reduce(function(a,i){return a+i.price*i.qty},0))+'</strong></div><div class="form-row"><label>スタッフへのメモ</label><input id="orderNote" placeholder="例：氷少なめ"></div><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="primary-btn" id="submitOrder">注文する</button></div>',function(){$('#submitOrder').onclick=function(){var t=cart.reduce(function(a,i){return a+i.price*i.qty},0);orders.push({id:String(Date.now()),seat:customerSeat,status:'ordered',items:cart.slice(),total:t,createdAt:new Date().toISOString(),note:$('#orderNote').value});save('ippukuOrders',orders);cart=[];closeModal();alert('注文を受け付けました');renderCart()}})};
+  function openCartModal(){
+    if(!cart.length){alert('商品を選んでください');return}
+    function draw(){
+      var total=cart.reduce(function(a,i){return a+i.price*i.qty},0);
+      $('#modal').innerHTML='<h3>注文内容</h3><div class="cart-edit-list">'+cart.map(function(i,idx){return '<div class="cart-edit-row"><div class="cart-edit-info"><b>'+esc(i.displayName||i.name)+'</b><small>'+yen(i.price)+' / 1点</small></div><div class="cart-qty"><button class="qty-btn" data-cart-dec="'+idx+'">−</button><strong>'+i.qty+'</strong><button class="qty-btn" data-cart-inc="'+idx+'">＋</button></div><div class="cart-line-total">'+yen(i.price*i.qty)+'</div><button class="cart-remove" data-cart-remove="'+idx+'">削除</button></div>'}).join('')+'</div><div class="detail-total"><span>合計</span><strong>'+yen(total)+'</strong></div><div class="form-row"><label>スタッフへのメモ</label><input id="orderNote" placeholder="例：氷少なめ"></div><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="primary-btn" id="submitOrder">注文する</button></div>';
+      $$('[data-close]').forEach(function(b){b.onclick=closeModal});
+      $$('[data-cart-dec]').forEach(function(b){b.onclick=function(){var i=Number(b.dataset.cartDec);cart[i].qty--;if(cart[i].qty<=0)cart.splice(i,1);renderCart();if(!cart.length){closeModal();return}draw()}});
+      $$('[data-cart-inc]').forEach(function(b){b.onclick=function(){cart[Number(b.dataset.cartInc)].qty++;renderCart();draw()}});
+      $$('[data-cart-remove]').forEach(function(b){b.onclick=function(){cart.splice(Number(b.dataset.cartRemove),1);renderCart();if(!cart.length){closeModal();return}draw()}});
+      $('#submitOrder').onclick=function(){
+        var t=cart.reduce(function(a,i){return a+i.price*i.qty},0);
+        var note=$('#orderNote').value;
+        orders.push({id:String(Date.now()),seat:customerSeat,status:'ordered',items:cart.slice(),total:t,createdAt:new Date().toISOString(),note:note});
+        save('ippukuOrders',orders);cart=[];closeModal();alert('注文を受け付けました');renderCart();renderAll();
+      };
+    }
+    showModal('<div></div>',draw);
+  }
+  $('#checkoutBtn').onclick=openCartModal;
   $('#managePromos').onclick=renderPromoManager;
   $('#showQrLinks').onclick=function(){var p=$('#qrLinksPanel');p.style.display=p.style.display==='none'?'block':'none';var base=location.href.split('?')[0].split('#')[0];$('#qrLinks').innerHTML=SEATS.map(function(s){return '<div class="qr-link"><b>'+s+'</b><br>'+base+'?seat='+encodeURIComponent(s)+'#order</div>'}).join('')};
   function showModal(html,after){$('#modal').innerHTML=html;$('#modalBackdrop').classList.add('show');$$('[data-close]').forEach(function(b){b.onclick=closeModal});if(after)after()} function closeModal(){$('#modalBackdrop').classList.remove('show')} $('#modalBackdrop').onclick=function(e){if(e.target===$('#modalBackdrop'))closeModal()};
