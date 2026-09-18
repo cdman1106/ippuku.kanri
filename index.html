@@ -98,6 +98,19 @@
 
     <section class="page" data-page="analytics">
       <div class="section-head"><div><h2>売上分析</h2><p>Airレジ商品別売上 CSVをもとに集計</p></div><label class="upload-btn">CSVを読み込む<input id="csvInput" type="file" accept=".csv" hidden></label></div>
+      <section class="strategy-panel">
+        <div class="strategy-head">
+          <div>
+            <span class="eyebrow">ACTION PLAN</span>
+            <h3>今後の強化方針</h3>
+            <p>売上だけでなく、粗利・粗利率・販売数を合わせて「何を伸ばすか」を自動判定します。</p>
+          </div>
+          <span class="badge">自動分析</span>
+        </div>
+        <div id="strategySummary" class="strategy-summary"></div>
+        <div id="strategyCards" class="strategy-cards"></div>
+        <div class="strategy-note">※ 現在のCSVは期間累計データなので「伸びている／落ちている」の判定はまだ行いません。AirレジAPIまたは月別明細が接続されたら前月比も追加します。</div>
+      </section>
       <div class="analytics-grid">
         <section class="panel"><div class="panel-head"><h3>粗利TOP10</h3><span class="badge">商品</span></div><div id="profitTable"></div></section>
         <section class="panel"><div class="panel-head"><h3>カテゴリー別</h3><span class="badge">売上 / 粗利</span></div><div id="categoryBars"></div></section>
