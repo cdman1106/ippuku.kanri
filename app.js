@@ -174,32 +174,34 @@
     return parts.join(' ・ ');
   }
   function cartKey(item,optionText){return item.name+'||'+(optionText||'')}
-  function pushCart(item,optionText){
+  function pushCart(item,optionText,priceDelta){
     var key=cartKey(item,optionText),f=cart.find(function(y){return y.key===key});
+    var finalPrice=Number(item.price||0)+Number(priceDelta||0);
     if(f)f.qty++;
-    else cart.push({key:key,name:item.name,displayName:item.name+(optionText?' / '+optionText:''),category:item.category,price:item.price,qty:1,option:optionText||''});
+    else cart.push({key:key,name:item.name,displayName:item.name+(optionText?' / '+optionText:''),category:item.category,price:finalPrice,basePrice:item.price,qty:1,option:optionText||''});
     renderCart();
   }
   function addMenuItem(item,done){
     if(!item.choices||!item.choices.length){
-      pushCart(item,item.fixedOption||''); if(done)done(); return;
+      pushCart(item,item.fixedOption||'',0); if(done)done(); return;
     }
-    var selected=[],step=0;
+    var selected=[],step=0,totalDelta=0;
     function chooseStep(){
       var group=item.choices[step];
       showModal(
         '<div class="choice-step"><span class="eyebrow">STEP '+(step+1)+' / '+item.choices.length+'</span><h3>'+esc(item.name)+'</h3><p class="choice-label">'+esc(group.label)+'</p>'+
-        '<div class="choice-grid">'+group.options.map(function(o){return '<button class="choice-btn" data-choice="'+esc(o)+'">'+esc(o)+'</button>'}).join('')+'</div>'+
+        '<div class="choice-grid">'+group.options.map(function(o){var label=typeof o==='string'?o:o.label;var delta=typeof o==='string'?0:Number(o.priceDelta||0);return '<button class="choice-btn" data-choice="'+esc(label)+'" data-delta="'+delta+'">'+esc(label)+(delta>0?'<small> +'+yen(delta)+'</small>':'')+'</button>'}).join('')+'</div>'+
         '<div class="choice-current">'+(selected.length?'選択中：'+selected.map(function(x){return esc(x.label)+' '+esc(x.value)}).join(' / '):'')+'</div>'+
         '<div class="modal-actions"><button class="ghost" data-close>キャンセル</button></div>',
         function(){
           $$('[data-choice]').forEach(function(b){
             b.onclick=function(){
               selected.push({label:group.label,value:b.dataset.choice});
+              totalDelta+=Number(b.dataset.delta||0);
               step++;
               if(step<item.choices.length){chooseStep();return}
               var text=selected.map(function(x){return x.label+': '+x.value}).join(' / ');
-              pushCart(item,text);closeModal();if(done)done();
+              pushCart(item,text,totalDelta);closeModal();if(done)done();
             };
           });
         }
@@ -211,14 +213,14 @@
   function renderCustomerMenu(){
     var all=window.MENU_DATA||[],cats=[];
     all.forEach(function(x){if(cats.indexOf(x.category)<0)cats.push(x.category)});
-    var labels={all:'すべて','Café':'Café','Relax':'Relax','Refresh':'Refresh','Snack':'Snack'};
+    var labels={all:'すべて','Café':'Café','Relax':'Relax','Refresh':'Refresh','Food':'軽食','Dessert':'スイーツ','Snack':'Snack'};
     var filters=[{key:'all',label:'すべて'}].concat(cats.map(function(c){return {key:c,label:labels[c]||c}}));
     $('#customerCategoryFilters').innerHTML=filters.map(function(f){return '<button class="customer-filter '+(customerCategory===f.key?'active':'')+'" data-customer-filter="'+esc(f.key)+'">'+esc(f.label)+'</button>'}).join('');
     $$('[data-customer-filter]').forEach(function(b){b.onclick=function(){customerCategory=b.dataset.customerFilter;renderCustomerMenu()}});
     var m=customerCategory==='all'?all:all.filter(function(x){return x.category===customerCategory});
     $('#customerMenu').innerHTML=m.map(function(x){
       var idx=all.findIndex(function(y){return y===x}),meta=menuMeta(x);
-      return '<article class="menu-card"><button class="menu-card-tap" data-add="'+idx+'" aria-label="'+esc(x.name)+'を追加"><div><small>'+esc(x.category)+'</small><h3>'+esc(x.name)+'</h3>'+(meta?'<p class="menu-meta">'+esc(meta)+'</p>':'')+'</div><div class="menu-bottom"><strong>'+yen(x.price)+'</strong><span class="add-btn">＋</span></div></button></article>';
+      return '<article class="menu-card '+(x.image?'with-photo':'')+'"><button class="menu-card-tap" data-add="'+idx+'" aria-label="'+esc(x.name)+'を追加">'+(x.image?'<div class="menu-photo-wrap"><img class="menu-photo" src="'+esc(x.image)+'" alt="'+esc(x.name)+'" loading="lazy"></div>':'')+'<div><small>'+esc(labels[x.category]||x.category)+'</small><h3>'+esc(x.name)+'</h3>'+(meta?'<p class="menu-meta">'+esc(meta)+'</p>':'')+'</div><div class="menu-bottom"><strong>'+yen(x.price)+(x.name==='濃厚バニラアイス'?'<small class="price-note">〜</small>':'')+'</strong><span class="add-btn">＋</span></div></button></article>';
     }).join('');
     $$('[data-add]').forEach(function(b){b.onclick=function(){var x=all[Number(b.dataset.add)];addMenuItem(x,function(){b.classList.add('just-added');setTimeout(function(){b.classList.remove('just-added')},350)})}});
   }
