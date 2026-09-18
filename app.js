@@ -97,6 +97,89 @@
   }
 
 
+  var backendReady=false, backendChecked=false, serverOrdersInitialized=false, serverSeenIds=new Set(), serverSyncTimer=null;
+
+  async function apiRequest(path,options){
+    try{
+      var res=await fetch(path,Object.assign({cache:'no-store',headers:{'content-type':'application/json'}},options||{}));
+      var data=null;
+      try{data=await res.json()}catch(e){}
+      if(!res.ok)return {ok:false,status:res.status,data:data};
+      return {ok:true,status:res.status,data:data};
+    }catch(e){
+      return {ok:false,status:0,data:null};
+    }
+  }
+
+  async function syncOrdersFromServer(initial){
+    if(!backendReady||document.body.classList.contains('customer-mode'))return;
+    var result=await apiRequest('/api/orders?limit=200');
+    if(!result.ok||!result.data||!Array.isArray(result.data.orders))return;
+    var incoming=result.data.orders;
+    var fresh=[];
+    if(serverOrdersInitialized&&!initial){
+      fresh=incoming.filter(function(o){return !serverSeenIds.has(String(o.id))});
+    }
+    orders=incoming;
+    save('ippukuOrders',orders);
+    serverSeenIds=new Set(incoming.map(function(o){return String(o.id)}));
+    serverOrdersInitialized=true;
+    renderAll();
+    if(fresh.length){
+      fresh.sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});
+      startOrderAlarm(fresh[0]);
+    }
+  }
+
+  async function detectBackend(){
+    var result=await apiRequest('/api/health');
+    backendChecked=true;
+    backendReady=!!(result.ok&&result.data&&result.data.database);
+    if(backendReady){
+      await syncOrdersFromServer(true);
+      if(!serverSyncTimer)serverSyncTimer=setInterval(function(){syncOrdersFromServer(false)},2000);
+    }
+  }
+
+  async function setOrderStatus(order,status){
+    var old=order.status;
+    order.status=status;
+    save('ippukuOrders',orders);
+    renderAll();
+    if(!backendReady)return;
+    var result=await apiRequest('/api/orders/'+encodeURIComponent(order.id),{
+      method:'PATCH',
+      body:JSON.stringify({status:status})
+    });
+    if(!result.ok){
+      order.status=old;
+      save('ippukuOrders',orders);
+      renderAll();
+      alert('注文状態を更新できませんでした。通信状態を確認してください。');
+      return;
+    }
+    await syncOrdersFromServer(true);
+  }
+
+  async function removeOrderById(id){
+    var previous=orders.slice();
+    orders=orders.filter(function(x){return String(x.id)!==String(id)});
+    save('ippukuOrders',orders);
+    renderAll();
+    if(!backendReady)return true;
+    var result=await apiRequest('/api/orders/'+encodeURIComponent(id),{method:'DELETE'});
+    if(!result.ok){
+      orders=previous;
+      save('ippukuOrders',orders);
+      renderAll();
+      alert('注文を削除できませんでした。通信状態を確認してください。');
+      return false;
+    }
+    await syncOrdersFromServer(true);
+    return true;
+  }
+
+
   function page(name){
     $$('.page').forEach(function(p){p.classList.toggle('active',p.dataset.page===name)});
     $$('.nav-item').forEach(function(b){b.classList.toggle('active',b.dataset.go===name)});
@@ -129,7 +212,7 @@
   }
   $$('.seat').forEach(function(b){b.onclick=function(){selectedSeat=b.dataset.seat;renderSeats()}});
   $$('.table-box').forEach(function(b){b.onclick=function(){var ss=TABLES[b.dataset.table], os=orders.filter(function(o){return ss.indexOf(o.seat)>=0&&o.status!=='paid'});showModal('<h3>'+b.dataset.table+' テーブル</h3>'+(os.length?os.map(orderHtml).join(''):'<p class="note">現在の注文はありません。</p>')+'<div class="modal-actions"><button class="ghost" data-close>閉じる</button></div>')}});
-  function renderSeatDetail(seat){var o=latest(seat), box=$('#seatDetail'); if(!o){box.innerHTML='<div class="detail-head"><h3>'+seat+'</h3><span class="status-chip">空席</span></div><div class="empty-detail"><strong>注文はありません</strong><button class="primary-btn" id="seatDemo">この席にデモ注文</button></div>';$('#seatDemo').onclick=function(){demo(seat)};return} box.innerHTML='<div class="detail-head"><div><h3>'+seat+'</h3><span class="detail-meta">'+time(o.createdAt)+' 注文</span></div><span class="status-chip '+o.status+'">'+LABEL[o.status]+'</span></div><div class="order-items">'+o.items.map(function(i){return '<div class="order-line"><span>'+esc(i.displayName||i.name)+' ×'+i.qty+'</span><strong>'+yen(i.price*i.qty)+'</strong></div>'}).join('')+'</div><div class="detail-total"><span>合計</span><strong>'+yen(o.total)+'</strong></div><p class="note">'+(o.note?'メモ：'+esc(o.note):'メモなし')+'</p><div class="status-row">'+['ordered','preparing','served','paid'].map(function(s){return '<button class="status-btn '+(o.status===s?'active':'')+'" data-set-status="'+s+'">'+LABEL[s]+'</button>'}).join('')+'</div>'; $$('[data-set-status]').forEach(function(b){b.onclick=function(){o.status=b.dataset.setStatus;save('ippukuOrders',orders);renderAll()}})}
+  function renderSeatDetail(seat){var o=latest(seat), box=$('#seatDetail'); if(!o){box.innerHTML='<div class="detail-head"><h3>'+seat+'</h3><span class="status-chip">空席</span></div><div class="empty-detail"><strong>注文はありません</strong><button class="primary-btn" id="seatDemo">この席にデモ注文</button></div>';$('#seatDemo').onclick=function(){demo(seat)};return} box.innerHTML='<div class="detail-head"><div><h3>'+seat+'</h3><span class="detail-meta">'+time(o.createdAt)+' 注文</span></div><span class="status-chip '+o.status+'">'+LABEL[o.status]+'</span></div><div class="order-items">'+o.items.map(function(i){return '<div class="order-line"><span>'+esc(i.displayName||i.name)+' ×'+i.qty+'</span><strong>'+yen(i.price*i.qty)+'</strong></div>'}).join('')+'</div><div class="detail-total"><span>合計</span><strong>'+yen(o.total)+'</strong></div><p class="note">'+(o.note?'メモ：'+esc(o.note):'メモなし')+'</p><div class="status-row">'+['ordered','preparing','served','paid'].map(function(s){return '<button class="status-btn '+(o.status===s?'active':'')+'" data-set-status="'+s+'">'+LABEL[s]+'</button>'}).join('')+'</div>'; $('[data-set-status]').forEach(function(b){b.onclick=function(){setOrderStatus(o,b.dataset.setStatus)}})}
   function orderHtml(o){return '<div class="order-card"><div class="order-seat">'+esc(o.seat)+'</div><div><b>'+o.items.map(function(i){return esc(i.displayName||i.name)+' ×'+i.qty}).join('、')+'</b><p>'+time(o.createdAt)+' ・ '+o.items.reduce(function(a,i){return a+i.qty},0)+'点 ・ '+yen(o.total)+'</p></div><div class="order-card-actions"><span class="status-chip '+o.status+'">'+LABEL[o.status]+'</span><button class="danger-link" data-delete-order="'+esc(o.id)+'">削除</button></div></div>'}
   function renderOrders(){var l=orders.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});if(orderFilter!=='all')l=l.filter(function(o){return o.status===orderFilter});$('#ordersList').innerHTML=l.length?l.map(orderHtml).join(''):'<div class="panel note">注文はまだありません。</div>';bindOrderDeleteButtons()}
   $$('[data-order-filter]').forEach(function(b){b.onclick=function(){orderFilter=b.dataset.orderFilter;$$('[data-order-filter]').forEach(function(x){x.classList.toggle('active',x===b)});renderOrders()}}); $('#demoOrderBtn').onclick=function(){demo(SEATS[Math.floor(Math.random()*SEATS.length)])};
@@ -138,10 +221,8 @@
     if(!o)return;
     showModal('<h3>注文を削除しますか？</h3><p class="note">席 '+esc(o.seat)+' / '+o.items.map(function(i){return esc(i.displayName||i.name)+' ×'+i.qty}).join('、')+'</p><p class="delete-warning">この操作は取り消せません。</p><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="danger-btn" id="confirmDeleteOrder">削除する</button></div>',function(){
       $('#confirmDeleteOrder').onclick=function(){
-        orders=orders.filter(function(x){return String(x.id)!==String(id)});
-        save('ippukuOrders',orders);
         closeModal();
-        renderAll();
+        removeOrderById(id);
         if(selectedSeat)renderSeats();
       };
     });
@@ -349,7 +430,7 @@
       $$('[data-cart-dec]').forEach(function(b){b.onclick=function(){var i=Number(b.dataset.cartDec);cart[i].qty--;if(cart[i].qty<=0)cart.splice(i,1);renderCart();if(!cart.length){closeModal();return}draw()}});
       $$('[data-cart-inc]').forEach(function(b){b.onclick=function(){cart[Number(b.dataset.cartInc)].qty++;renderCart();draw()}});
       $$('[data-cart-remove]').forEach(function(b){b.onclick=function(){cart.splice(Number(b.dataset.cartRemove),1);renderCart();if(!cart.length){closeModal();return}draw()}});
-      $('#submitOrder').onclick=function(){
+      $('#submitOrder').onclick=async function(){
         if(!customerSeat){
           alert('席番号を選択してください。');
           return;
@@ -364,18 +445,35 @@
         try{
           var t=cart.reduce(function(a,i){return a+Number(i.price||0)*Number(i.qty||0)},0);
           var noteEl=$('#orderNote');
-          var newOrder={
-            id:String(Date.now()),
+          var payload={
             seat:customerSeat,
-            status:'ordered',
             items:cart.map(function(i){return Object.assign({},i)}),
-            total:t,
-            createdAt:new Date().toISOString(),
             note:noteEl?noteEl.value:''
           };
-          orders.push(newOrder);
-          save('ippukuOrders',orders);
-          signalNewOrderSafely(newOrder);
+          var newOrder;
+          if(backendReady){
+            var result=await apiRequest('/api/orders',{
+              method:'POST',
+              body:JSON.stringify(payload)
+            });
+            if(!result.ok||!result.data||!result.data.order)throw new Error('SERVER_ORDER_FAILED');
+            newOrder=result.data.order;
+            orders=[newOrder].concat(orders.filter(function(x){return String(x.id)!==String(newOrder.id)}));
+            save('ippukuOrders',orders);
+          }else{
+            newOrder={
+              id:String(Date.now()),
+              seat:customerSeat,
+              status:'ordered',
+              items:payload.items,
+              total:t,
+              createdAt:new Date().toISOString(),
+              note:payload.note
+            };
+            orders.push(newOrder);
+            save('ippukuOrders',orders);
+            signalNewOrderSafely(newOrder);
+          }
           cart=[];
           renderCart();
           closeModal();
@@ -398,6 +496,7 @@
   function showModal(html,after){$('#modal').innerHTML=html;$('#modalBackdrop').classList.add('show');$$('[data-close]').forEach(function(b){b.onclick=closeModal});if(after)after()} function closeModal(){$('#modalBackdrop').classList.remove('show')} $('#modalBackdrop').onclick=function(e){if(e.target===$('#modalBackdrop'))closeModal()};
   function renderAll(){renderDashboard();renderOrders();renderAnalytics();renderInventory();renderReserves();renderSeats()}
   renderAll();
+  detectBackend();
   function syncRoute(){
     if(location.hash==='#order'||new URLSearchParams(location.search).has('seat'))page('customer');
   }
