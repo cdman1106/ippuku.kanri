@@ -349,3 +349,17 @@ body.alarm-ringing{overflow:hidden;touch-action:none}
 .night-fee-line{color:#e8d6ff}
 .night-fee-line strong{color:#d8c9ff}
 .night-fee-info{display:block!important;padding:8px 10px!important;border-radius:10px;background:#1d1830;color:#bfb2dd;font-size:10px!important;line-height:1.5}
+
+.seat[data-status="closed"]{background:#201d1b;border-color:#5d5148;color:#8d8178;opacity:.72}
+.status-chip.closed{background:#4b2b28;color:#f0aaa2}
+.seat-access-control{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0;padding:13px;border:1px solid #4a3b30;border-radius:14px;background:#191510}
+.seat-access-control>div{min-width:0}.seat-access-control strong{display:block;font-size:13px}.seat-access-control span{display:block;margin-top:4px;color:var(--muted);font-size:10px;line-height:1.5}
+.seat-access-control.closed{border-color:#365843;background:#152019}.seat-access-control.closed strong{color:#a8ddb8}
+.seat-access-control button{flex:0 0 auto;min-height:44px}
+.seat-closed-notice{margin:0 0 12px;padding:14px;border:1px solid #82433c;border-radius:14px;background:#321b18;color:#ffd7d1}
+.seat-closed-notice strong,.seat-closed-notice span{display:block}.seat-closed-notice strong{font-size:14px}.seat-closed-notice span{margin-top:5px;font-size:11px;line-height:1.55}
+button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:560px){
+  .seat-access-control{align-items:stretch;flex-direction:column}
+  .seat-access-control button{width:100%;min-height:50px}
+}
