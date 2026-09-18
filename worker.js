@@ -4,6 +4,7 @@ const SEATS = new Set([
   "T2-01","T2-02","T3-01","T3-02"
 ]);
 const STATUSES = new Set(["ordered","preparing","served","paid"]);
+const DRINK_CATEGORIES = new Set(["Café","Relax","Refresh"]);
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -46,6 +47,25 @@ function normalizeItem(item) {
   };
 }
 
+function hasDrinkInItems(items) {
+  return items.some((item) => DRINK_CATEGORIES.has(String(item?.category || "")));
+}
+
+async function hasDrinkForSeatSession(env, seat, since) {
+  let stmt;
+  if (since) {
+    stmt = env.DB.prepare(
+      "SELECT 1 AS ok FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.seat = ? AND o.created_at >= ? AND oi.category IN ('Café','Relax','Refresh') LIMIT 1"
+    ).bind(seat, since);
+  } else {
+    stmt = env.DB.prepare(
+      "SELECT 1 AS ok FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.seat = ? AND o.status != 'paid' AND oi.category IN ('Café','Relax','Refresh') LIMIT 1"
+    ).bind(seat);
+  }
+  const row = await stmt.first();
+  return !!row;
+}
+
 async function ensureSeatAccessTable(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS seat_access (seat TEXT PRIMARY KEY, is_open INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL)"
@@ -57,10 +77,13 @@ async function getSeatAccess(env, seat) {
   const row = await env.DB.prepare(
     "SELECT is_open, updated_at FROM seat_access WHERE seat = ?"
   ).bind(seat).first();
+  const open = row ? Number(row.is_open) === 1 : true;
+  const updatedAt = row?.updated_at || null;
   return {
     seat,
-    open: row ? Number(row.is_open) === 1 : true,
-    updatedAt: row?.updated_at || null
+    open,
+    updatedAt,
+    drinkOrdered: open ? await hasDrinkForSeatSession(env, seat, updatedAt) : false
   };
 }
 
@@ -70,10 +93,18 @@ async function listSeatAccess(env) {
     "SELECT seat, is_open, updated_at FROM seat_access"
   ).all();
   const rows = result.results || [];
-  const bySeat = {};
-  for (const seat of SEATS) bySeat[seat] = true;
-  for (const row of rows) bySeat[row.seat] = Number(row.is_open) === 1;
-  return bySeat;
+  const seats = {};
+  const details = {};
+  for (const seat of SEATS) {
+    seats[seat] = true;
+    details[seat] = { open: true, updatedAt: null };
+  }
+  for (const row of rows) {
+    const open = Number(row.is_open) === 1;
+    seats[row.seat] = open;
+    details[row.seat] = { open, updatedAt: row.updated_at || null };
+  }
+  return { seats, details };
 }
 
 async function setSeatAccess(request, env, seat) {
@@ -87,7 +118,7 @@ async function setSeatAccess(request, env, seat) {
   await env.DB.prepare(
     "INSERT INTO seat_access (seat, is_open, updated_at) VALUES (?, ?, ?) ON CONFLICT(seat) DO UPDATE SET is_open = excluded.is_open, updated_at = excluded.updated_at"
   ).bind(seat, body.open ? 1 : 0, now).run();
-  return json({ ok: true, seat, open: body.open, updatedAt: now });
+  return json({ ok: true, seat, open: body.open, updatedAt: now, drinkOrdered: false });
 }
 
 async function getOrder(env, id) {
@@ -191,6 +222,17 @@ async function createOrder(request, env) {
     : [];
   if (!items.length || items.length > 50) return json({ ok: false, error: "INVALID_ITEMS" }, 400);
 
+  const drinkSatisfied =
+    hasDrinkInItems(items) ||
+    await hasDrinkForSeatSession(env, seat, access.updatedAt);
+  if (!drinkSatisfied) {
+    return json({
+      ok: false,
+      error: "DRINK_REQUIRED",
+      message: "店内利用はお一人様ワンドリンクオーダー制です。"
+    }, 409);
+  }
+
   const id = crypto.randomUUID();
   const nowDate = new Date();
   const now = nowDate.toISOString();
@@ -267,7 +309,7 @@ async function handleApi(request, env) {
     return json({ ok: true, database: true });
   }
   if (url.pathname === "/api/seats" && request.method === "GET") {
-    return json({ ok: true, seats: await listSeatAccess(env) });
+    return json({ ok: true, ...(await listSeatAccess(env)) });
   }
 
   const seatMatch = url.pathname.match(/^\/api\/seats\/([^/]+)$/);
