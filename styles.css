@@ -81,3 +81,9 @@ body.customer-mode .form-row input,body.customer-mode .form-row select{min-heigh
 .choice-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:16px 0}
 .choice-btn{min-height:58px;border:1px solid #5b472f;background:#2a2118;color:var(--text);border-radius:14px;font-size:15px;font-weight:800}
 .choice-btn:active{transform:scale(.98);background:#3b2c1c}
+
+.choice-step .eyebrow{display:block;margin-bottom:6px}
+.choice-label{margin:8px 0 12px;font-size:14px;font-weight:800;color:var(--accent2)}
+.choice-current{min-height:18px;margin-top:10px;color:var(--muted);font-size:10px;line-height:1.5}
+body.customer-mode .choice-grid{grid-template-columns:1fr 1fr}
+body.customer-mode .choice-btn{min-height:60px;font-size:14px}
