@@ -212,7 +212,50 @@
   }
   $$('.seat').forEach(function(b){b.onclick=function(){selectedSeat=b.dataset.seat;renderSeats()}});
   $$('.table-box').forEach(function(b){b.onclick=function(){var ss=TABLES[b.dataset.table], os=orders.filter(function(o){return ss.indexOf(o.seat)>=0&&o.status!=='paid'});showModal('<h3>'+b.dataset.table+' テーブル</h3>'+(os.length?os.map(orderHtml).join(''):'<p class="note">現在の注文はありません。</p>')+'<div class="modal-actions"><button class="ghost" data-close>閉じる</button></div>')}});
-  function renderSeatDetail(seat){var o=latest(seat), box=$('#seatDetail'); if(!o){box.innerHTML='<div class="detail-head"><h3>'+seat+'</h3><span class="status-chip">空席</span></div><div class="empty-detail"><strong>注文はありません</strong><button class="primary-btn" id="seatDemo">この席にデモ注文</button></div>';$('#seatDemo').onclick=function(){demo(seat)};return} box.innerHTML='<div class="detail-head"><div><h3>'+seat+'</h3><span class="detail-meta">'+time(o.createdAt)+' 注文</span></div><span class="status-chip '+o.status+'">'+LABEL[o.status]+'</span></div><div class="order-items">'+o.items.map(function(i){return '<div class="order-line"><span>'+esc(i.displayName||i.name)+' ×'+i.qty+'</span><strong>'+yen(i.price*i.qty)+'</strong></div>'}).join('')+'</div><div class="detail-total"><span>合計</span><strong>'+yen(o.total)+'</strong></div><p class="note">'+(o.note?'メモ：'+esc(o.note):'メモなし')+'</p><div class="status-row">'+['ordered','preparing','served','paid'].map(function(s){return '<button class="status-btn '+(o.status===s?'active':'')+'" data-set-status="'+s+'">'+LABEL[s]+'</button>'}).join('')+'</div>'; $('[data-set-status]').forEach(function(b){b.onclick=function(){setOrderStatus(o,b.dataset.setStatus)}})}
+  function renderSeatDetail(seat){
+    var box=$('#seatDetail');
+    var seatOrders=orders
+      .filter(function(o){return o.seat===seat})
+      .sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});
+    var activeOrders=seatOrders.filter(function(o){return o.status!=='paid'});
+    var paidOrders=seatOrders.filter(function(o){return o.status==='paid'}).slice(0,10);
+
+    if(!seatOrders.length){
+      box.innerHTML='<div class="detail-head"><h3>'+esc(seat)+'</h3><span class="status-chip">空席</span></div><div class="empty-detail"><strong>注文はありません</strong><span>この席の注文が入ると、ここに履歴として残ります。</span><button class="primary-btn" id="seatDemo">この席にデモ注文</button></div>';
+      $('#seatDemo').onclick=function(){demo(seat)};
+      return;
+    }
+
+    var activeTotal=activeOrders.reduce(function(sum,o){return sum+Number(o.total||0)},0);
+
+    function seatOrderBlock(o,index,isPaid){
+      return '<article class="seat-order-history '+(index===0&&!isPaid?'latest-order':'')+'">'+
+        '<div class="seat-order-history-head"><div>'+
+          '<div class="seat-order-time">'+time(o.createdAt)+(index===0&&!isPaid?' <span class="latest-badge">最新</span>':'')+'</div>'+
+          '<small>注文ID '+esc(String(o.id).slice(-8))+'</small>'+
+        '</div><span class="status-chip '+o.status+'">'+(LABEL[o.status]||o.status)+'</span></div>'+
+        '<div class="order-items">'+(o.items||[]).map(function(i){return '<div class="order-line"><span>'+esc(i.displayName||i.name)+' ×'+i.qty+'</span><strong>'+yen(i.price*i.qty)+'</strong></div>'}).join('')+'</div>'+
+        '<div class="detail-total"><span>この注文</span><strong>'+yen(o.total)+'</strong></div>'+
+        (o.note?'<p class="note">メモ：'+esc(o.note)+'</p>':'')+
+        (!isPaid?'<div class="status-row">'+['ordered','preparing','served','paid'].map(function(s){return '<button class="status-btn '+(o.status===s?'active':'')+'" data-seat-order-id="'+esc(o.id)+'" data-seat-order-status="'+s+'">'+LABEL[s]+'</button>'}).join('')+'</div>':'')+
+      '</article>';
+    }
+
+    box.innerHTML=
+      '<div class="detail-head"><div><h3>'+esc(seat)+'</h3><span class="detail-meta">現在の注文 '+activeOrders.length+'件</span></div><span class="status-chip '+(activeOrders[0]?activeOrders[0].status:'paid')+'">'+(activeOrders.length?'注文あり':'会計済')+'</span></div>'+
+      (activeOrders.length?'<div class="seat-running-total"><span>現在の席合計</span><strong>'+yen(activeTotal)+'</strong></div>':'')+
+      '<div class="seat-history-section"><div class="seat-history-title"><strong>現在の注文</strong><span>'+activeOrders.length+'件</span></div>'+
+      (activeOrders.length?activeOrders.map(function(o,i){return seatOrderBlock(o,i,false)}).join(''):'<p class="note">未会計の注文はありません。</p>')+
+      '</div>'+
+      (paidOrders.length?'<div class="seat-history-section paid-history"><div class="seat-history-title"><strong>過去の注文</strong><span>直近'+paidOrders.length+'件</span></div>'+paidOrders.map(function(o,i){return seatOrderBlock(o,i,true)}).join('')+'</div>':'');
+
+    $$('[data-seat-order-id]').forEach(function(b){
+      b.onclick=function(){
+        var o=orders.find(function(x){return String(x.id)===String(b.dataset.seatOrderId)});
+        if(o)setOrderStatus(o,b.dataset.seatOrderStatus);
+      };
+    });
+  }
   function orderHtml(o){return '<div class="order-card"><div class="order-seat">'+esc(o.seat)+'</div><div><b>'+o.items.map(function(i){return esc(i.displayName||i.name)+' ×'+i.qty}).join('、')+'</b><p>'+time(o.createdAt)+' ・ '+o.items.reduce(function(a,i){return a+i.qty},0)+'点 ・ '+yen(o.total)+'</p></div><div class="order-card-actions"><span class="status-chip '+o.status+'">'+LABEL[o.status]+'</span><button class="danger-link" data-delete-order="'+esc(o.id)+'">削除</button></div></div>'}
   function renderOrders(){var l=orders.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});if(orderFilter!=='all')l=l.filter(function(o){return o.status===orderFilter});$('#ordersList').innerHTML=l.length?l.map(orderHtml).join(''):'<div class="panel note">注文はまだありません。</div>';bindOrderDeleteButtons()}
   $$('[data-order-filter]').forEach(function(b){b.onclick=function(){orderFilter=b.dataset.orderFilter;$$('[data-order-filter]').forEach(function(x){x.classList.toggle('active',x===b)});renderOrders()}}); $('#demoOrderBtn').onclick=function(){demo(SEATS[Math.floor(Math.random()*SEATS.length)])};
