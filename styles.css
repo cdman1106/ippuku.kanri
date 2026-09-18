@@ -87,3 +87,12 @@ body.customer-mode .form-row input,body.customer-mode .form-row select{min-heigh
 .choice-current{min-height:18px;margin-top:10px;color:var(--muted);font-size:10px;line-height:1.5}
 body.customer-mode .choice-grid{grid-template-columns:1fr 1fr}
 body.customer-mode .choice-btn{min-height:60px;font-size:14px}
+
+.menu-card.with-photo{min-height:238px}
+.menu-card.with-photo .menu-card-tap{padding:10px;min-height:238px}
+.menu-photo-wrap{width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:11px;margin-bottom:10px;background:#0e0c0a}
+.menu-photo{width:100%;height:100%;object-fit:cover;display:block}
+.price-note{font-size:9px;margin-left:2px;color:var(--muted)}
+.food-order-note{margin:0 0 10px;padding:10px 12px;border:1px solid #5b4326;border-radius:12px;background:#241b12;color:#e9cfaa;font-size:11px;line-height:1.5}
+.choice-btn small{display:block;margin-top:3px;font-size:10px;color:var(--accent2)}
+@media(max-width:560px){.menu-card.with-photo{min-height:218px}.menu-card.with-photo .menu-card-tap{min-height:218px;padding:9px}.menu-photo-wrap{margin-bottom:8px}.menu-card.with-photo h3{font-size:13px}}
