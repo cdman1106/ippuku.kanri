@@ -76,3 +76,8 @@ body.customer-mode .form-row input,body.customer-mode .form-row select{min-heigh
   .customer-category-filters{top:83px;margin:0 -2px;padding:9px 2px}
   .cart-bar{left:50%;bottom:14px;transform:translateX(-50%);width:min(496px,calc(100vw - 28px));border:1px solid #55432f;border-radius:16px;padding:12px 14px}
 }
+
+.menu-meta{margin:7px 0 0;color:var(--accent2);font-size:9px;line-height:1.45}
+.choice-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:16px 0}
+.choice-btn{min-height:58px;border:1px solid #5b472f;background:#2a2118;color:var(--text);border-radius:14px;font-size:15px;font-weight:800}
+.choice-btn:active{transform:scale(.98);background:#3b2c1c}
