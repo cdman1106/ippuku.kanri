@@ -25,7 +25,7 @@
     if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory') renderInventory(); if(name==='reserve') renderReserves(); if(name==='customer') renderCustomer();
     window.scrollTo(0,0);
   }
-  $$('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){page('customer')}; $('#refreshBtn').onclick=renderAll;
+  $$('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){if(location.hash!=='#order')location.hash='order';page('customer')}; $('#refreshBtn').onclick=renderAll;
 
   function renderDashboard(){
     var s=sales.reduce(function(a,p){return a+Number(p.sales||0)},0), g=sales.reduce(function(a,p){return a+Number(p.grossProfit||0)},0), u=sales.reduce(function(a,p){return a+Number(p.units||0)},0);
@@ -268,5 +268,10 @@
   $('#showQrLinks').onclick=function(){var p=$('#qrLinksPanel');p.style.display=p.style.display==='none'?'block':'none';var base=location.href.split('?')[0].split('#')[0];$('#qrLinks').innerHTML=SEATS.map(function(s){return '<div class="qr-link"><b>'+s+'</b><br>'+base+'?seat='+encodeURIComponent(s)+'#order</div>'}).join('')};
   function showModal(html,after){$('#modal').innerHTML=html;$('#modalBackdrop').classList.add('show');$$('[data-close]').forEach(function(b){b.onclick=closeModal});if(after)after()} function closeModal(){$('#modalBackdrop').classList.remove('show')} $('#modalBackdrop').onclick=function(e){if(e.target===$('#modalBackdrop'))closeModal()};
   function renderAll(){renderDashboard();renderOrders();renderAnalytics();renderInventory();renderReserves();renderSeats()}
-  renderAll(); if(location.hash==='#order'||new URLSearchParams(location.search).has('seat'))page('customer');
+  renderAll();
+  function syncRoute(){
+    if(location.hash==='#order'||new URLSearchParams(location.search).has('seat'))page('customer');
+  }
+  window.addEventListener('hashchange',syncRoute);
+  syncRoute();
 })();
