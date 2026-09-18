@@ -557,3 +557,51 @@ body{background:#fff;color:var(--text)}
 .choice-btn{background:#fff!important;color:#2f2924!important;border-color:#ddd5cd!important}
 .no-order-alert-list{background:#fff7f5;color:#6c2e27}
 .drink-upsell-banner,.checkout-upsell{background:#fffaf2}
+
+
+/* Customer checkout no-black cleanup */
+body.customer-mode .modal-backdrop{background:rgba(86,72,60,.24)}
+body.customer-mode .primary-btn,
+body.customer-mode .cart-bar .primary-btn{
+  background:#d8b274;
+  color:#2d241b;
+  border:1px solid #c79d5d;
+  box-shadow:none
+}
+body.customer-mode .add-btn,
+body.customer-mode .drink-upsell-card i,
+body.customer-mode .checkout-upsell-grid i{
+  background:#d8b274;
+  color:#2d241b
+}
+body.customer-mode .night-fee-info{
+  background:#f7f3fb!important;
+  color:#675c73!important;
+  border:1px solid #ddd4e8;
+  padding:10px 12px!important
+}
+body.customer-mode .night-fee-line{
+  background:#f7f3fb;
+  color:#675c73;
+  border:1px solid #ddd4e8;
+  border-radius:10px;
+  padding:9px 11px!important
+}
+body.customer-mode .night-fee-line strong{color:#675c73}
+body.customer-mode .checkout-totals{border-top-color:#ddd6cf}
+body.customer-mode .cart-remove{color:#b47a73}
+body.customer-mode .ghost{
+  background:#fff;
+  color:#4c4138;
+  border:1px solid #d9d2cb
+}
+body.customer-mode .qty-btn{
+  background:#fff;
+  color:#4a3f36;
+  border-color:#d8d0c8
+}
+body.customer-mode .drink-upsell-card,
+body.customer-mode .checkout-upsell-grid button{
+  background:#fff;
+  border-color:#e5d7c5
+}
