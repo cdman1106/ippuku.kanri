@@ -224,7 +224,7 @@
       checkout.disabled=!customerSeatOpen;
       checkout.textContent=customerSeatOpen?'注文内容を確認':'この席は注文受付終了';
     }
-    $('.menu-card-tap,.promo-add,.cling-order-btn').forEach(function(b){b.disabled=!customerSeatOpen});
+    $$('.menu-card-tap,.promo-add,.cling-order-btn').forEach(function(b){b.disabled=!customerSeatOpen});
     if(showMessage&&wasOpen&&!customerSeatOpen){
       alert('この席の注文受付は終了しました。');
     }
@@ -269,7 +269,7 @@
 
   function latest(seat){return orders.filter(function(o){return o.seat===seat&&o.status!=='paid'}).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)})[0]}
   function renderSeats(){
-    $('.seat').forEach(function(b){
+    $$('.seat').forEach(function(b){
       var seat=b.dataset.seat,o=latest(seat),isOpen=seatAccess[seat]!==false;
       b.dataset.status=isOpen?(o?o.status:'free'):'closed';
       b.classList.toggle('selected',selectedSeat===seat);
@@ -277,7 +277,7 @@
     });
     if(selectedSeat) renderSeatDetail(selectedSeat);
   }
-  $$('.seat').forEach(function(b){b.onclick=function(){selectedSeat=b.dataset.seat;renderSeats()}});
+  $$$('.seat').forEach(function(b){b.onclick=function(){selectedSeat=b.dataset.seat;renderSeats()}});
   $$('.table-box').forEach(function(b){b.onclick=function(){var ss=TABLES[b.dataset.table], os=orders.filter(function(o){return ss.indexOf(o.seat)>=0&&o.status!=='paid'});showModal('<h3>'+b.dataset.table+' テーブル</h3>'+(os.length?os.map(orderHtml).join(''):'<p class="note">現在の注文はありません。</p>')+'<div class="modal-actions"><button class="ghost" data-close>閉じる</button></div>')}});
   function renderSeatDetail(seat){
     var box=$('#seatDetail');
@@ -324,7 +324,7 @@
 
     var toggle=$('#toggleSeatAccess');
     if(toggle)toggle.onclick=function(){setSeatOpen(seat,!isOpen)};
-    $('[data-seat-order-id]').forEach(function(b){
+    $$('[data-seat-order-id]').forEach(function(b){
       b.onclick=function(){
         var o=orders.find(function(x){return String(x.id)===String(b.dataset.seatOrderId)});
         if(o)setOrderStatus(o,b.dataset.seatOrderStatus);
@@ -449,7 +449,7 @@
       (ps.length?'<div class="promo-title-row"><div><span class="eyebrow">RECOMMENDED</span><h3>今、いっぷくでおすすめ</h3></div><small>気になったらそのまま追加できます</small></div><div class="promo-scroll">'+ps.map(function(p,i){var m=promoProduct(p.product);return '<article class="promo-card"><span class="promo-tag">'+esc(p.tag||'おすすめ')+'</span><div class="promo-copy"><h3>'+esc(p.headline||p.product)+'</h3><p>'+esc(p.copy||'ぜひ一度お試しください。')+'</p></div><div class="promo-product"><div><b>'+esc(p.product)+'</b><strong>'+yen(m?m.price:0)+'</strong></div><button class="promo-add" data-promo-add="'+esc(p.product)+'">これを注文 ＋</button></div></article>'}).join('')+'</div>':'');
     var clingBtn=$('#clingGachaAdd');
     if(clingBtn&&cling)clingBtn.onclick=function(){addMenuItem(cling,function(){clingBtn.textContent='追加しました ✓';setTimeout(function(){clingBtn.textContent='ガチャで注文 ¥10,000'},900)})};
-    $('[data-promo-add]').forEach(function(b){b.onclick=function(){var m=promoProduct(b.dataset.promoAdd);if(!m)return;addMenuItem(m,function(){b.textContent='追加しました ✓';setTimeout(function(){b.textContent='これを注文 ＋'},900)})}});
+    $$('[data-promo-add]').forEach(function(b){b.onclick=function(){var m=promoProduct(b.dataset.promoAdd);if(!m)return;addMenuItem(m,function(){b.textContent='追加しました ✓';setTimeout(function(){b.textContent='これを注文 ＋'},900)})}});
     refreshCustomerSeatAccess(false);
   }
   function renderPromoManager(){
