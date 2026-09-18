@@ -1,12 +1,29 @@
 window.MENU_DATA = [
-  {name:"紅茶/アイスティー",category:"Relax",price:550,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
-  {name:"ミルクティー",category:"Relax",price:580,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
+  {name:"紅茶/アイスティー",category:"Relax",price:550,badges:["HOT","ICE"],choices:[
+    {label:"温度",options:["HOT","ICE"]},
+    {label:"飲み方",options:["ストレート","ミルク","レモン"]},
+    {label:"甘さ",options:["なし","砂糖","ガムシロップ"]}
+  ]},
+  {name:"ミルクティー",category:"Relax",price:580,badges:["HOT","ICE"],choices:[
+    {label:"温度",options:["HOT","ICE"]},
+    {label:"甘さ",options:["なし","砂糖","ガムシロップ"]}
+  ]},
   {name:"抹茶ラテ",category:"Relax",price:660,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
-  {name:"ルイボスティー",category:"Relax",price:550,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
+  {name:"ルイボスティー",category:"Relax",price:550,badges:["HOT","ICE"],choices:[
+    {label:"温度",options:["HOT","ICE"]},
+    {label:"甘さ",options:["なし","砂糖","ガムシロップ"]}
+  ]},
   {name:"ゆず蜜",category:"Relax",price:650,badges:["HOT","ICE"],choices:[{label:"割り方",options:["水割り","お湯割り","炭酸割り"]}]},
 
-  {name:"コーヒー",category:"Café",price:550,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
-  {name:"カフェラテ",category:"Café",price:580,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
+  {name:"コーヒー",category:"Café",price:550,badges:["HOT","ICE"],choices:[
+    {label:"温度",options:["HOT","ICE"]},
+    {label:"甘さ",options:["なし（ブラック）","砂糖","ガムシロップ"]},
+    {label:"コーヒーフレッシュ",options:["なし","あり"]}
+  ]},
+  {name:"カフェラテ",category:"Café",price:580,badges:["HOT","ICE"],choices:[
+    {label:"温度",options:["HOT","ICE"]},
+    {label:"甘さ",options:["なし","砂糖","ガムシロップ"]}
+  ]},
   {name:"ウィンナーコーヒー",category:"Café",price:650,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
   {name:"キャラメルマキアート",category:"Café",price:660,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
   {name:"ホワイトモカ",category:"Café",price:660,badges:["HOT"],fixedOption:"HOT"},
