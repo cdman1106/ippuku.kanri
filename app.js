@@ -25,12 +25,14 @@
     b.textContent=soundEnabled?'🔔 通知音ON中':'🔕 通知音ON';
     b.classList.toggle('sound-on',soundEnabled);
   }
-  function ensureAudio(){
+  async function ensureAudio(){
     var Ctx=window.AudioContext||window.webkitAudioContext;
     if(!Ctx)return false;
-    if(!audioCtx)audioCtx=new Ctx();
-    if(audioCtx.state==='suspended')audioCtx.resume();
-    return true;
+    try{
+      if(!audioCtx)audioCtx=new Ctx();
+      if(audioCtx.state!=='running')await audioCtx.resume();
+      return audioCtx.state==='running';
+    }catch(e){return false}
   }
   function alarmBeep(){
     if(!soundEnabled||!audioCtx)return;
@@ -46,7 +48,8 @@
     });
   }
   function startOrderAlarm(order){
-    if(!order||document.body.classList.contains('customer-mode'))return;
+    if(!order)return;
+    if(document.body.classList.contains('customer-mode')&&!soundEnabled)return;
     var overlay=$('#orderAlarm');
     if(!overlay)return;
     $('#alarmSeat').textContent=order.seat||'--';
@@ -56,9 +59,12 @@
     alarmActive=true;
     try{if(navigator.vibrate)navigator.vibrate([450,180,450,180,700])}catch(e){}
     if(soundEnabled){
-      ensureAudio(); alarmBeep();
-      if(alarmTimer)clearInterval(alarmTimer);
-      alarmTimer=setInterval(function(){if(alarmActive)alarmBeep()},850);
+      ensureAudio().then(function(ok){
+        if(!ok)return;
+        alarmBeep();
+        if(alarmTimer)clearInterval(alarmTimer);
+        alarmTimer=setInterval(function(){if(alarmActive)alarmBeep()},850);
+      });
     }
   }
   function stopOrderAlarm(){
@@ -68,13 +74,15 @@
     document.body.classList.remove('alarm-ringing');
     try{if(navigator.vibrate)navigator.vibrate(0)}catch(e){}
   }
-  function enableOrderSound(){
-    if(!ensureAudio()){
-      alert('この端末では通知音を利用できません。');
+  async function enableOrderSound(){
+    var ok=await ensureAudio();
+    if(!ok){
+      alert('この端末では通知音を利用できません。端末のメディア音量も確認してください。');
       return;
     }
     soundEnabled=true; updateSoundButton();
     alarmBeep();
+    setTimeout(alarmBeep,420);
   }
   function findOrderBySignal(sig){
     var latestOrders=load('ippukuOrders',[]);
@@ -342,6 +350,7 @@
         var signal={id:newOrder.id,seat:newOrder.seat,items:newOrder.items,total:newOrder.total,ts:Date.now()};
         localStorage.setItem('ippukuOrderSignal',JSON.stringify(signal));
         if(orderChannel)try{orderChannel.postMessage(signal)}catch(e){}
+        if(soundEnabled)startOrderAlarm(newOrder);
         cart=[];closeModal();alert('注文を受け付けました。\n\nお会計の際は1階へ行き、席番号「'+customerSeat+'」を1階スタッフにお伝えください。');renderCart();renderAll();
       };
     }
