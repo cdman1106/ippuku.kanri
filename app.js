@@ -277,7 +277,7 @@
     });
     if(selectedSeat) renderSeatDetail(selectedSeat);
   }
-  $$$('.seat').forEach(function(b){b.onclick=function(){selectedSeat=b.dataset.seat;renderSeats()}});
+  $('.seat').forEach(function(b){b.onclick=function(){selectedSeat=b.dataset.seat;renderSeats()}});
   $$('.table-box').forEach(function(b){b.onclick=function(){var ss=TABLES[b.dataset.table], os=orders.filter(function(o){return ss.indexOf(o.seat)>=0&&o.status!=='paid'});showModal('<h3>'+b.dataset.table+' テーブル</h3>'+(os.length?os.map(orderHtml).join(''):'<p class="note">現在の注文はありません。</p>')+'<div class="modal-actions"><button class="ghost" data-close>閉じる</button></div>')}});
   function renderSeatDetail(seat){
     var box=$('#seatDetail');
@@ -445,7 +445,7 @@
     var cling=promoProduct('The Cling Lighter ガチャ');
     box.style.display='block';
     box.innerHTML=
-      '<article class="cling-promo"><div class="cling-kicker">当店おすすめ！</div><h3>The Cling Lighter</h3><p>重厚感のある人気ライター。買い方を選べます。</p><div class="cling-price-grid"><div><span>ガチャ・ランダム</span><strong>¥10,000</strong></div><div><span>指名買い</span><strong>¥15,000〜¥20,000</strong></div></div><button class="cling-order-btn" id="clingGachaAdd">ガチャで注文 ¥10,000</button><small>※ 指名買いはスタッフへお声がけください。</small></article>'+
+      '<article class="cling-promo"><div class="cling-kicker">当店おすすめ！</div><h3>The Cling Lighter</h3><p>開閉時に鳴る音が魅力のライターです。<strong>タバコ試し吸い棚にサンプルを置いています。</strong> 実際に手に取って、ぜひ音を鳴らしてみてください。</p><div class="cling-try-note"><span>🔊 SAMPLE</span><b>試し吸い棚で音を体験できます</b><small>料金・購入方法も棚に詳しく掲示しています。</small></div><div class="cling-price-grid"><div><span>ガチャ・ランダム</span><strong>¥10,000</strong></div><div><span>指名買い</span><strong>¥15,000〜¥20,000</strong></div></div><button class="cling-order-btn" id="clingGachaAdd">ガチャで注文 ¥10,000</button><small>※ 指名買いはサンプル棚の料金案内をご確認いただくか、スタッフへお声がけください。</small></article>'+
       (ps.length?'<div class="promo-title-row"><div><span class="eyebrow">RECOMMENDED</span><h3>今、いっぷくでおすすめ</h3></div><small>気になったらそのまま追加できます</small></div><div class="promo-scroll">'+ps.map(function(p,i){var m=promoProduct(p.product);return '<article class="promo-card"><span class="promo-tag">'+esc(p.tag||'おすすめ')+'</span><div class="promo-copy"><h3>'+esc(p.headline||p.product)+'</h3><p>'+esc(p.copy||'ぜひ一度お試しください。')+'</p></div><div class="promo-product"><div><b>'+esc(p.product)+'</b><strong>'+yen(m?m.price:0)+'</strong></div><button class="promo-add" data-promo-add="'+esc(p.product)+'">これを注文 ＋</button></div></article>'}).join('')+'</div>':'');
     var clingBtn=$('#clingGachaAdd');
     if(clingBtn&&cling)clingBtn.onclick=function(){addMenuItem(cling,function(){clingBtn.textContent='追加しました ✓';setTimeout(function(){clingBtn.textContent='ガチャで注文 ¥10,000'},900)})};
