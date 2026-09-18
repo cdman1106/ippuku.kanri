@@ -930,6 +930,36 @@
   function cartHasDrink(items){
     return items.some(function(i){return i.category==='Café'||i.category==='Relax'||i.category==='Refresh'});
   }
+  function cartHasFoodLike(items){
+    return items.some(function(i){return i.category==='Food'||i.category==='Dessert'||i.category==='Snack'});
+  }
+  function upsellItems(){
+    var menu=window.MENU_DATA||[];
+    return ['ポパイサンド','あんバターサンド','チーズケーキ'].map(function(name){
+      return menu.find(function(x){return x.name===name});
+    }).filter(Boolean);
+  }
+  function renderDrinkUpsell(){
+    var box=$('#drinkUpsellBanner');if(!box)return;
+    var show=cartHasDrink(cart)&&!cartHasFoodLike(cart);
+    box.style.display=show?'block':'none';
+    if(!show){box.innerHTML='';return}
+    var items=upsellItems();
+    box.innerHTML='<div class="drink-upsell-head"><div><span>ご一緒にどうですか？</span><strong>ドリンクと一緒に軽食・スイーツも</strong></div><small>タップで追加できます</small></div>'+
+      '<div class="drink-upsell-scroll">'+items.map(function(x){
+        return '<button class="drink-upsell-card" data-upsell-add="'+esc(x.name)+'">'+
+          (x.image?'<img src="'+esc(x.image)+'" alt="">':'')+
+          '<span><b>'+esc(x.name)+'</b><small>'+yen(x.price)+'</small></span><i>＋</i></button>';
+      }).join('')+'</div>';
+    $$('[data-upsell-add]').forEach(function(b){
+      b.onclick=function(){
+        var item=(window.MENU_DATA||[]).find(function(x){return x.name===b.dataset.upsellAdd});
+        if(!item)return;
+        pushCart(item,'',0);
+        renderDrinkUpsell();
+      };
+    });
+  }
   function cartAmounts(items){
     var subtotal=items.reduce(function(a,i){return a+Number(i.price||0)*Number(i.qty||0)},0);
     var feeBase=items.reduce(function(a,i){
@@ -942,6 +972,7 @@
   function renderCart(){
     var q=cart.reduce(function(a,i){return a+i.qty},0),a=cartAmounts(cart);
     $('#cartSummary').textContent=q+'点 / '+yen(a.total);
+    renderDrinkUpsell();
   }
   function signalNewOrderSafely(order){
     setTimeout(function(){
@@ -964,7 +995,14 @@
     }
     function draw(){
       var amounts=cartAmounts(cart);
-      $('#modal').innerHTML='<h3>注文内容</h3><div class="cart-edit-list">'+cart.map(function(i,idx){return '<div class="cart-edit-row"><div class="cart-edit-info"><b>'+esc(i.displayName||i.name)+'</b><small>'+yen(i.price)+' / 1点</small></div><div class="cart-qty"><button class="qty-btn" data-cart-dec="'+idx+'">−</button><strong>'+i.qty+'</strong><button class="qty-btn" data-cart-inc="'+idx+'">＋</button></div><div class="cart-line-total">'+yen(i.price*i.qty)+'</div><button class="cart-remove" data-cart-remove="'+idx+'">削除</button></div>'}).join('')+'</div>'+
+      var upsellHtml='';
+      if(cartHasDrink(cart)&&!cartHasFoodLike(cart)){
+        var u=upsellItems();
+        upsellHtml='<section class="checkout-upsell"><div class="checkout-upsell-title"><span>あと1品いかがですか？</span><strong>ドリンクと相性のいいおすすめ</strong></div><div class="checkout-upsell-grid">'+u.map(function(x){
+          return '<button data-checkout-upsell="'+esc(x.name)+'">'+(x.image?'<img src="'+esc(x.image)+'" alt="">':'')+'<span><b>'+esc(x.name)+'</b><small>'+yen(x.price)+'</small></span><i>＋</i></button>';
+        }).join('')+'</div></section>';
+      }
+      $('#modal').innerHTML='<h3>注文内容</h3><div class="cart-edit-list">'+cart.map(function(i,idx){return '<div class="cart-edit-row"><div class="cart-edit-info"><b>'+esc(i.displayName||i.name)+'</b><small>'+yen(i.price)+' / 1点</small></div><div class="cart-qty"><button class="qty-btn" data-cart-dec="'+idx+'">−</button><strong>'+i.qty+'</strong><button class="qty-btn" data-cart-inc="'+idx+'">＋</button></div><div class="cart-line-total">'+yen(i.price*i.qty)+'</div><button class="cart-remove" data-cart-remove="'+idx+'">削除</button></div>'}).join('')+'</div>'+upsellHtml+
         '<div class="checkout-totals"><div><span>商品小計</span><strong>'+yen(amounts.subtotal)+'</strong></div>'+
         (amounts.nightFee?'<div class="night-fee-line"><span>深夜料金（金・土 21時以降 10%）</span><strong>＋'+yen(amounts.nightFee)+'</strong></div>':'<div class="night-fee-info">金・土の21:00〜翌1:00は深夜料金10%が加算されます。ZIPPOガチャ・Clingガチャは対象外です。</div>')+
         '<div class="detail-total"><span>合計</span><strong>'+yen(amounts.total)+'</strong></div></div>'+
@@ -973,6 +1011,12 @@
       $$('[data-cart-dec]').forEach(function(b){b.onclick=function(){var i=Number(b.dataset.cartDec);cart[i].qty--;if(cart[i].qty<=0)cart.splice(i,1);renderCart();if(!cart.length){closeModal();return}draw()}});
       $$('[data-cart-inc]').forEach(function(b){b.onclick=function(){cart[Number(b.dataset.cartInc)].qty++;renderCart();draw()}});
       $$('[data-cart-remove]').forEach(function(b){b.onclick=function(){cart.splice(Number(b.dataset.cartRemove),1);renderCart();if(!cart.length){closeModal();return}draw()}});
+      $$('[data-checkout-upsell]').forEach(function(b){b.onclick=function(){
+        var item=(window.MENU_DATA||[]).find(function(x){return x.name===b.dataset.checkoutUpsell});
+        if(!item)return;
+        pushCart(item,'',0);
+        draw();
+      }});
       $('#submitOrder').onclick=async function(){
         if(!customerSeat){
           alert('席番号を選択してください。');
