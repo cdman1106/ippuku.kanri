@@ -312,3 +312,8 @@ body.alarm-ringing{overflow:hidden;touch-action:none}
     display:none !important;
   }
 }
+
+.order-success{text-align:center;padding:6px 0}
+.order-success-mark{width:64px;height:64px;margin:0 auto 12px;border-radius:50%;display:grid;place-items:center;background:#315f42;color:#baf0ca;font-size:34px;font-weight:900}
+.order-success h3{margin:4px 0 10px}
+.order-success p{margin:6px 0}
