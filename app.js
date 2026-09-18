@@ -927,6 +927,9 @@
       return false;
     }
   }
+  function cartHasDrink(items){
+    return items.some(function(i){return i.category==='Café'||i.category==='Relax'||i.category==='Refresh'});
+  }
   function cartAmounts(items){
     var subtotal=items.reduce(function(a,i){return a+Number(i.price||0)*Number(i.qty||0)},0);
     var feeBase=items.reduce(function(a,i){
@@ -955,6 +958,10 @@
       if(!allowed){alert('この席の注文受付は終了しました。');return}
     }
     if(!cart.length){alert('商品を選んでください');return}
+    if(!customerDrinkSatisfied&&!cartHasDrink(cart)){
+      alert('当店はワンドリンクオーダー制です。先にドリンクを1杯以上お選びください。');
+      return;
+    }
     function draw(){
       var amounts=cartAmounts(cart);
       $('#modal').innerHTML='<h3>注文内容</h3><div class="cart-edit-list">'+cart.map(function(i,idx){return '<div class="cart-edit-row"><div class="cart-edit-info"><b>'+esc(i.displayName||i.name)+'</b><small>'+yen(i.price)+' / 1点</small></div><div class="cart-qty"><button class="qty-btn" data-cart-dec="'+idx+'">−</button><strong>'+i.qty+'</strong><button class="qty-btn" data-cart-inc="'+idx+'">＋</button></div><div class="cart-line-total">'+yen(i.price*i.qty)+'</div><button class="cart-remove" data-cart-remove="'+idx+'">削除</button></div>'}).join('')+'</div>'+
@@ -998,6 +1005,9 @@
             method:'POST',
             body:JSON.stringify(payload)
           });
+          if(result.status===409&&result.data&&result.data.error==='DRINK_REQUIRED'){
+            throw new Error('DRINK_REQUIRED');
+          }
           if(result.status===403&&result.data&&result.data.error==='SEAT_CLOSED'){
             customerSeatOpen=false;
             refreshCustomerSeatAccess(false);
@@ -1005,6 +1015,7 @@
           }
           if(!result.ok||!result.data||!result.data.order)throw new Error('SERVER_ORDER_FAILED');
           newOrder=result.data.order;
+          if(cartHasDrink(payload.items))customerDrinkSatisfied=true;
           orders=[newOrder].concat(orders.filter(function(x){return String(x.id)!==String(newOrder.id)}));
           save('ippukuOrders',orders);
           cart=[];
@@ -1020,6 +1031,8 @@
           if(e&&e.message==='SEAT_CLOSED'){
             closeModal();
             alert('この席の注文受付は終了しました。スタッフへお声がけください。');
+          }else if(e&&e.message==='DRINK_REQUIRED'){
+            alert('当店はワンドリンクオーダー制です。ドリンクを1杯以上ご注文ください。');
           }else if(e&&e.message==='BACKEND_OFFLINE'){
             alert('現在、注文サーバーに接続できません。注文は送信されていません。スタッフへお声がけください。');
           }else{
