@@ -256,7 +256,7 @@
       };
     });
   }
-  function orderHtml(o){return '<div class="order-card"><div class="order-seat">'+esc(o.seat)+'</div><div><b>'+o.items.map(function(i){return esc(i.displayName||i.name)+' ×'+i.qty}).join('、')+'</b><p>'+time(o.createdAt)+' ・ '+o.items.reduce(function(a,i){return a+i.qty},0)+'点 ・ '+yen(o.total)+'</p></div><div class="order-card-actions"><span class="status-chip '+o.status+'">'+LABEL[o.status]+'</span><button class="danger-link" data-delete-order="'+esc(o.id)+'">削除</button></div></div>'}
+  function orderHtml(o){return '<div class="order-card"><div class="order-seat">'+esc(o.seat)+'</div><div><b>'+o.items.map(function(i){return esc(i.displayName||i.name)+' ×'+i.qty}).join('、')+'</b><p>'+time(o.createdAt)+' ・ '+o.items.reduce(function(a,i){return a+(i.category==='Fee'?0:i.qty)},0)+'点 ・ '+yen(o.total)+'</p></div><div class="order-card-actions"><span class="status-chip '+o.status+'">'+LABEL[o.status]+'</span><button class="danger-link" data-delete-order="'+esc(o.id)+'">削除</button></div></div>'}
   function renderOrders(){var l=orders.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});if(orderFilter!=='all')l=l.filter(function(o){return o.status===orderFilter});$('#ordersList').innerHTML=l.length?l.map(orderHtml).join(''):'<div class="panel note">注文はまだありません。</div>';bindOrderDeleteButtons()}
   $$('[data-order-filter]').forEach(function(b){b.onclick=function(){orderFilter=b.dataset.orderFilter;$$('[data-order-filter]').forEach(function(x){x.classList.toggle('active',x===b)});renderOrders()}}); $('#demoOrderBtn').onclick=function(){demo(SEATS[Math.floor(Math.random()*SEATS.length)])};
   function deleteOrderById(id){
@@ -454,7 +454,25 @@
     $$('[data-add]').forEach(function(b){b.onclick=function(){var x=all[Number(b.dataset.add)];addMenuItem(x,function(){b.classList.add('just-added');setTimeout(function(){b.classList.remove('just-added')},350)})}});
   }
 
-  function renderCart(){var q=cart.reduce(function(a,i){return a+i.qty},0),t=cart.reduce(function(a,i){return a+i.price*i.qty},0);$('#cartSummary').textContent=q+'点 / '+yen(t)}
+  function isNightChargeTime(){
+    try{
+      var parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',hour:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+      var h=Number(parts.find(function(p){return p.type==='hour'}).value||0);
+      return h>=21||h<6;
+    }catch(e){
+      var h=new Date().getHours();
+      return h>=21||h<6;
+    }
+  }
+  function cartAmounts(items){
+    var subtotal=items.reduce(function(a,i){return a+Number(i.price||0)*Number(i.qty||0)},0);
+    var nightFee=isNightChargeTime()?Math.round(subtotal*.10):0;
+    return {subtotal:subtotal,nightFee:nightFee,total:subtotal+nightFee};
+  }
+  function renderCart(){
+    var q=cart.reduce(function(a,i){return a+i.qty},0),a=cartAmounts(cart);
+    $('#cartSummary').textContent=q+'点 / '+yen(a.total);
+  }
   function signalNewOrderSafely(order){
     setTimeout(function(){
       try{
@@ -467,8 +485,12 @@
   function openCartModal(){
     if(!cart.length){alert('商品を選んでください');return}
     function draw(){
-      var total=cart.reduce(function(a,i){return a+i.price*i.qty},0);
-      $('#modal').innerHTML='<h3>注文内容</h3><div class="cart-edit-list">'+cart.map(function(i,idx){return '<div class="cart-edit-row"><div class="cart-edit-info"><b>'+esc(i.displayName||i.name)+'</b><small>'+yen(i.price)+' / 1点</small></div><div class="cart-qty"><button class="qty-btn" data-cart-dec="'+idx+'">−</button><strong>'+i.qty+'</strong><button class="qty-btn" data-cart-inc="'+idx+'">＋</button></div><div class="cart-line-total">'+yen(i.price*i.qty)+'</div><button class="cart-remove" data-cart-remove="'+idx+'">削除</button></div>'}).join('')+'</div><div class="detail-total"><span>合計</span><strong>'+yen(total)+'</strong></div><div class="form-row"><label>スタッフへのメモ</label><input id="orderNote" placeholder="例：氷少なめ"></div><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="primary-btn" id="submitOrder">注文する</button></div>';
+      var amounts=cartAmounts(cart);
+      $('#modal').innerHTML='<h3>注文内容</h3><div class="cart-edit-list">'+cart.map(function(i,idx){return '<div class="cart-edit-row"><div class="cart-edit-info"><b>'+esc(i.displayName||i.name)+'</b><small>'+yen(i.price)+' / 1点</small></div><div class="cart-qty"><button class="qty-btn" data-cart-dec="'+idx+'">−</button><strong>'+i.qty+'</strong><button class="qty-btn" data-cart-inc="'+idx+'">＋</button></div><div class="cart-line-total">'+yen(i.price*i.qty)+'</div><button class="cart-remove" data-cart-remove="'+idx+'">削除</button></div>'}).join('')+'</div>'+
+        '<div class="checkout-totals"><div><span>商品小計</span><strong>'+yen(amounts.subtotal)+'</strong></div>'+
+        (amounts.nightFee?'<div class="night-fee-line"><span>深夜料金（21時以降 10%）</span><strong>＋'+yen(amounts.nightFee)+'</strong></div>':'<div class="night-fee-info">21:00以降のご注文は深夜料金10%が加算されます。</div>')+
+        '<div class="detail-total"><span>合計</span><strong>'+yen(amounts.total)+'</strong></div></div>'+
+        '<div class="form-row"><label>スタッフへのメモ</label><input id="orderNote" placeholder="例：氷少なめ"></div><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="primary-btn" id="submitOrder">注文する</button></div>';
       $$('[data-close]').forEach(function(b){b.onclick=closeModal});
       $$('[data-cart-dec]').forEach(function(b){b.onclick=function(){var i=Number(b.dataset.cartDec);cart[i].qty--;if(cart[i].qty<=0)cart.splice(i,1);renderCart();if(!cart.length){closeModal();return}draw()}});
       $$('[data-cart-inc]').forEach(function(b){b.onclick=function(){cart[Number(b.dataset.cartInc)].qty++;renderCart();draw()}});
@@ -486,7 +508,8 @@
         var btn=$('#submitOrder');
         if(btn){btn.disabled=true;btn.textContent='送信中…'}
         try{
-          var t=cart.reduce(function(a,i){return a+Number(i.price||0)*Number(i.qty||0)},0);
+          var amounts=cartAmounts(cart);
+          var t=amounts.total;
           var noteEl=$('#orderNote');
           var payload={
             seat:customerSeat,
@@ -504,11 +527,15 @@
             orders=[newOrder].concat(orders.filter(function(x){return String(x.id)!==String(newOrder.id)}));
             save('ippukuOrders',orders);
           }else{
+            var localItems=payload.items.slice();
+            if(amounts.nightFee){
+              localItems.push({name:'深夜料金',displayName:'深夜料金（21時以降10%）',category:'Fee',price:amounts.nightFee,qty:1,option:''});
+            }
             newOrder={
               id:String(Date.now()),
               seat:customerSeat,
               status:'ordered',
-              items:payload.items,
+              items:localItems,
               total:t,
               createdAt:new Date().toISOString(),
               note:payload.note
