@@ -48,5 +48,5 @@ window.MENU_DATA = [
   {name:"チョコレート",category:"Snack",price:110},
 
   {name:"ZIPPOガチャ",category:"Gacha",price:5000,description:"1回5,000円・深夜料金対象外",nightFeeExempt:true},
-  {name:"The Cling Lighter ガチャ",category:"Lighter",price:10000,description:"ランダムで1点。指名買いは店頭で15,000〜20,000円"}
+  {name:"The Cling Lighter ガチャ",category:"Lighter",price:10000,description:"ランダムで1点。試し吸い棚にサンプルあり。音を鳴らして試せます。指名買いは15,000〜20,000円"}
 ];
