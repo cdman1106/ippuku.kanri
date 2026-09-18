@@ -13,9 +13,9 @@
     {product:'コーヒー',tag:'いっぷくおすすめ',headline:'まずは、ほっと一杯。',copy:'喫煙時間のお供に。ゆっくり過ごしたい時の定番です。',active:true},
     {product:'キャラメルマキアート',tag:'甘めが好きな方へ',headline:'少し贅沢な一杯を。',copy:'ゆっくり過ごしたい時におすすめのカフェメニューです。',active:true}
   ]);
-  var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', customerSeat=new URLSearchParams(location.search).get('seat')||load('ippukuCustomerSeat','')||'';
+  var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', inventoryShopFilter='all', customerSeat=new URLSearchParams(location.search).get('seat')||load('ippukuCustomerSeat','')||'';
   var seatAccess={}, customerSeatOpen=true, customerSeatTimer=null;
-  var INVENTORY_SEED_VERSION=3;
+  var INVENTORY_SEED_VERSION=4;
   var INVENTORY_SEED=[
     {name:'ガムシロップ',stock:'',min:6,unit:'個',source:'スタンバイ'},
     {name:'コーヒーフレッシュ',stock:'',min:20,unit:'個',source:'スタンバイ'},
@@ -86,10 +86,45 @@
 
     {name:'ゆず蜜',stock:'',min:0.25,unit:'瓶',source:'買出し・野菜室'},
     {name:'ジャム（ブルーベリー）',stock:'',min:0.25,unit:'瓶',source:'買出し・野菜室'},
-    {name:'あんこ',stock:'',min:0.25,unit:'瓶',source:'買出し・野菜室'}
+    {name:'あんこ',stock:'',min:0.25,unit:'瓶',source:'買出し・野菜室'},
+    {name:'ライター用オイル',stock:'',min:1,unit:'本',source:'買出し・その他'}
   ];
+
+  function inventoryKey(x){return String(x.name||'')+'|'+String(x.source||'')}
+  var INVENTORY_SHOP_DEFAULTS={
+    '紅茶（日東）|買出し・棚2':'イオン',
+    'ゼラチン|買出し・棚3':'ネット',
+    'ナッツ|買出し・棚3':'コストコ',
+    'ストロー|買出し・棚5':'アスクル',
+    'ペリエ|買出し・冷蔵庫':'ネット',
+    'りんご炭酸|買出し・冷蔵庫':'ネット',
+    'モンスター|買出し・冷蔵庫':'ネット',
+    '炭酸水|買出し・冷蔵庫':'コストコ',
+    'アイスクリーム|買出し・冷凍庫':'イオン',
+    'きのこ|買出し・冷凍庫':'コストコ',
+    'ライター用オイル|買出し・その他':'Mr.Max'
+  };
+  INVENTORY_SEED.forEach(function(x){
+    x.shop=INVENTORY_SHOP_DEFAULTS[inventoryKey(x)]||x.shop||'';
+  });
+
   if(load('ippukuInventorySeedVersion',0)<INVENTORY_SEED_VERSION){
-    inventory=INVENTORY_SEED.map(function(x){return Object.assign({},x)});
+    if(!inventory.length){
+      inventory=INVENTORY_SEED.map(function(x){return Object.assign({},x)});
+    }else{
+      var existingByKey={};
+      inventory.forEach(function(x){existingByKey[inventoryKey(x)]=x});
+      INVENTORY_SEED.forEach(function(seed){
+        var old=existingByKey[inventoryKey(seed)];
+        if(old){
+          if(!old.shop&&seed.shop)old.shop=seed.shop;
+          if(old.min===undefined||old.min===null)old.min=seed.min;
+          if(!old.unit)old.unit=seed.unit;
+        }else{
+          inventory.push(Object.assign({},seed));
+        }
+      });
+    }
     save('ippukuInventory',inventory);
     save('ippukuInventorySeedVersion',INVENTORY_SEED_VERSION);
   }
@@ -486,16 +521,88 @@
   $('#csvInput').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var rows=parseCSV(r.result),h=rows[0].map(function(x){return x.trim()}),ix=function(n){return h.indexOf(n)},num=function(row,n){return Number(String(row[ix(n)]||'0').replace(/,/g,''))||0};var m=rows.slice(1).filter(function(row){return row[ix('商品名')]}).map(function(row){var s=num(row,'販売総売上'),g=num(row,'粗利総額'),u=num(row,'販売商品数');return {name:row[ix('商品名')],category:row[ix('カテゴリー')]||'未設定',sales:s,grossProfit:g,units:u,margin:s?Number((g/s*100).toFixed(1)):0}});if(m.length){sales=m;save('ippukuSales',sales);alert(m.length+'商品を読み込みました');renderAll()}}catch(err){alert('CSVを読み込めませんでした')}};r.readAsText(f,'Shift_JIS')};
   function parseCSV(t){var out=[],row=[],v='',q=false;for(var i=0;i<t.length;i++){var c=t[i],n=t[i+1];if(q){if(c==='"'&&n==='"'){v+='"';i++}else if(c==='"')q=false;else v+=c}else{if(c==='"')q=true;else if(c===','){row.push(v);v=''}else if(c==='\n'){row.push(v.replace(/\r$/,''));out.push(row);row=[];v=''}else v+=c}}if(v||row.length){row.push(v);out.push(row)}return out}
 
+  function knownInventoryShops(){
+    var preferred=['イオン','ネット','コストコ','アスクル','Mr.Max','コスモス','業務スーパー'];
+    var used=[];
+    inventory.forEach(function(x){
+      var s=String(x.shop||'').trim();
+      if(s&&used.indexOf(s)<0)used.push(s);
+    });
+    used.sort(function(a,b){
+      var ai=preferred.indexOf(a),bi=preferred.indexOf(b);
+      if(ai<0)ai=999;if(bi<0)bi=999;
+      return ai===bi?a.localeCompare(b,'ja'):ai-bi;
+    });
+    return used;
+  }
+
+  function inventoryShopLabel(x){
+    return String(x.shop||'').trim()||'未設定';
+  }
+
   function renderInventory(){
     var inventoryList=$('#inventoryList');
+    var filterBox=$('#inventoryShopFilters');
     if(!inventoryList)return;
-    inventoryList.innerHTML=inventory.map(function(x,i){
-      var hasStock=x.stock!==''&&x.stock!==null&&x.stock!==undefined&&!isNaN(Number(x.stock));
-      var stock=hasStock?Number(x.stock):null;
-      var low=hasStock&&stock<=Number(x.min||0);
-      var meta=(x.source?esc(x.source)+' / ':'')+'基準 '+x.min+esc(x.unit)+(x.note?' / '+esc(x.note):'');
-      return '<div class="inventory-card"><div><b>'+esc(x.name)+'</b><small>'+meta+(low?' ・ 補充/買出し推奨':'')+'</small></div><input class="stock-input" type="number" step="0.01" placeholder="現在庫" value="'+(hasStock?stock:'')+'" data-stock="'+i+'"><span class="status '+(!hasStock?'waiting':(low?'waiting':'ok'))+'">'+(!hasStock?'未入力':stock+esc(x.unit))+'</span></div>';
+
+    var shops=knownInventoryShops();
+    var filterItems=['all'].concat(shops);
+    if(inventory.some(function(x){return !String(x.shop||'').trim()}))filterItems.push('__unset__');
+
+    if(filterBox){
+      filterBox.innerHTML=filterItems.map(function(s){
+        var label=s==='all'?'すべて':(s==='__unset__'?'未設定':s);
+        return '<button class="inventory-shop-filter '+(inventoryShopFilter===s?'active':'')+'" data-inventory-shop="'+esc(s)+'">'+esc(label)+'</button>';
+      }).join('');
+      $$('[data-inventory-shop]').forEach(function(b){
+        b.onclick=function(){inventoryShopFilter=b.dataset.inventoryShop;renderInventory()};
+      });
+    }
+
+    var rows=inventory.map(function(x,i){return {x:x,i:i}}).filter(function(row){
+      if(inventoryShopFilter==='all')return true;
+      if(inventoryShopFilter==='__unset__')return !String(row.x.shop||'').trim();
+      return String(row.x.shop||'').trim()===inventoryShopFilter;
+    });
+
+    var groups={};
+    rows.forEach(function(row){
+      var k=inventoryShopLabel(row.x);
+      if(!groups[k])groups[k]=[];
+      groups[k].push(row);
+    });
+
+    var order=Object.keys(groups).sort(function(a,b){
+      if(a==='未設定')return 1;if(b==='未設定')return -1;
+      var pref=['イオン','ネット','コストコ','アスクル','Mr.Max','コスモス','業務スーパー'];
+      var ai=pref.indexOf(a),bi=pref.indexOf(b);
+      if(ai<0)ai=999;if(bi<0)bi=999;
+      return ai===bi?a.localeCompare(b,'ja'):ai-bi;
+    });
+
+    if(!rows.length){
+      inventoryList.innerHTML='<div class="panel note">この購入先の商品はありません。</div>';
+      return;
+    }
+
+    inventoryList.innerHTML=order.map(function(shop){
+      var cards=groups[shop].map(function(row){
+        var x=row.x,i=row.i;
+        var hasStock=x.stock!==''&&x.stock!==null&&x.stock!==undefined&&!isNaN(Number(x.stock));
+        var stock=hasStock?Number(x.stock):null;
+        var low=hasStock&&stock<=Number(x.min||0);
+        var meta=(x.source?esc(x.source)+' / ':'')+'基準 '+x.min+esc(x.unit)+(x.note?' / '+esc(x.note):'');
+        return '<div class="inventory-card">'+
+          '<div class="inventory-main"><div class="inventory-card-title"><b>'+esc(x.name)+'</b><span class="inventory-shop-badge">'+esc(shop)+'</span></div>'+
+          '<small>'+meta+(low?' ・ 補充/買出し推奨':'')+'</small></div>'+
+          '<input class="stock-input" type="number" step="0.01" placeholder="現在庫" value="'+(hasStock?stock:'')+'" data-stock="'+i+'">'+
+          '<span class="status '+(!hasStock?'waiting':(low?'waiting':'ok'))+'">'+(!hasStock?'未入力':stock+esc(x.unit))+'</span>'+
+          '<button class="inventory-edit-btn" data-edit-inventory="'+i+'">編集</button>'+
+        '</div>';
+      }).join('');
+      return '<section class="inventory-shop-group"><div class="inventory-shop-head"><h3>'+esc(shop)+'</h3><span>'+groups[shop].length+'品</span></div>'+cards+'</section>';
     }).join('');
+
     $$('[data-stock]').forEach(function(inp){
       inp.onchange=function(){
         var v=inp.value.trim();
@@ -504,7 +611,61 @@
         renderInventory();
       };
     });
+    $$('[data-edit-inventory]').forEach(function(b){
+      b.onclick=function(){openInventoryEditor(Number(b.dataset.editInventory))};
+    });
   }
+
+  function inventoryShopOptions(){
+    var shops=['イオン','ネット','コストコ','アスクル','Mr.Max','コスモス','業務スーパー'];
+    knownInventoryShops().forEach(function(s){if(shops.indexOf(s)<0)shops.push(s)});
+    return shops.map(function(s){return '<option value="'+esc(s)+'"></option>'}).join('');
+  }
+
+  function openInventoryEditor(index){
+    var isNew=index<0;
+    var x=isNew?{name:'',stock:'',min:0,unit:'個',source:'',shop:''}:inventory[index];
+    showModal(
+      '<h3>'+(isNew?'在庫商品を追加':'在庫商品を編集')+'</h3>'+
+      '<div class="form-row"><label>商品名</label><input id="invName" value="'+esc(x.name||'')+'"></div>'+
+      '<div class="form-row"><label>購入先</label><input id="invShop" list="inventoryShopChoices" placeholder="例：イオン / コストコ / ネット" value="'+esc(x.shop||'')+'"><datalist id="inventoryShopChoices">'+inventoryShopOptions()+'</datalist></div>'+
+      '<div class="form-row"><label>保管場所・チェック場所</label><input id="invSource" placeholder="例：冷凍庫 / 棚3" value="'+esc(x.source||'')+'"></div>'+
+      '<div class="inventory-edit-grid">'+
+        '<div class="form-row"><label>現在庫</label><input id="invStock" type="number" step="0.01" value="'+(x.stock===''?'':Number(x.stock||0))+'"></div>'+
+        '<div class="form-row"><label>補充・買出し基準</label><input id="invMin" type="number" step="0.01" value="'+Number(x.min||0)+'"></div>'+
+        '<div class="form-row"><label>単位</label><input id="invUnit" value="'+esc(x.unit||'個')+'"></div>'+
+      '</div>'+
+      '<div class="modal-actions">'+
+        (!isNew?'<button class="danger-btn" id="deleteInventoryItem">削除</button>':'')+
+        '<button class="ghost" data-close>取消</button><button class="primary-btn" id="saveInv">保存</button>'+
+      '</div>',
+      function(){
+        $('#saveInv').onclick=function(){
+          var stockValue=$('#invStock').value.trim();
+          var item={
+            name:$('#invName').value.trim()||'未設定',
+            shop:$('#invShop').value.trim(),
+            source:$('#invSource').value.trim(),
+            stock:stockValue===''?'':Number(stockValue),
+            min:Number($('#invMin').value)||0,
+            unit:$('#invUnit').value.trim()||'個'
+          };
+          if(!isNew&&x.note)item.note=x.note;
+          if(isNew)inventory.push(item);else inventory[index]=item;
+          save('ippukuInventory',inventory);
+          closeModal();renderInventory();
+        };
+        var del=$('#deleteInventoryItem');
+        if(del)del.onclick=function(){
+          if(!confirm('この在庫商品を削除しますか？'))return;
+          inventory.splice(index,1);
+          save('ippukuInventory',inventory);
+          closeModal();renderInventory();
+        };
+      }
+    );
+  }
+
   function buildInventoryLineText(){
     var low=inventory.filter(function(x){
       var has=x.stock!==''&&x.stock!==null&&x.stock!==undefined&&!isNaN(Number(x.stock));
@@ -524,12 +685,21 @@
 
     var refill=low.filter(function(x){return String(x.source||'').indexOf('スタンバイ')===0});
     var buy=low.filter(function(x){return String(x.source||'').indexOf('スタンバイ')!==0});
-    addGroup('買出しが必要',buy);
+    var byShop={};
+    buy.forEach(function(x){
+      var shop=inventoryShopLabel(x);
+      if(!byShop[shop])byShop[shop]=[];
+      byShop[shop].push(x);
+    });
+    Object.keys(byShop).sort(function(a,b){
+      if(a==='未設定')return 1;if(b==='未設定')return -1;
+      return a.localeCompare(b,'ja');
+    }).forEach(function(shop){
+      addGroup(shop==='未設定'?'購入先未設定':shop+'で購入',byShop[shop]);
+    });
     addGroup('店内補充が必要',refill);
 
-    if(!low.length){
-      lines.push('', '現在、基準以下の在庫はありません。');
-    }
+    if(!low.length)lines.push('', '現在、基準以下の在庫はありません。');
     return lines.join('\n');
   }
 
@@ -554,7 +724,7 @@
     var text=buildInventoryLineText();
     showModal(
       '<h3>LINE用 在庫リスト</h3>'+
-      '<p class="note">現在庫が基準以下のものだけをまとめています。未入力の商品は含みません。</p>'+
+      '<p class="note">不足品を購入先ごとにまとめています。未入力の商品は含みません。</p>'+
       '<textarea id="inventoryLineText" class="line-copy-text" readonly>'+esc(text)+'</textarea>'+
       '<div class="modal-actions"><button class="ghost" data-close>閉じる</button><button class="ghost" id="shareInventoryLine">共有</button><button class="primary-btn" id="copyInventoryLine">まとめてコピー</button></div>',
       function(){
@@ -583,7 +753,9 @@
   var inventoryLineBtn=$('#inventoryLineBtn');
   if(inventoryLineBtn)inventoryLineBtn.onclick=openInventoryLineCopy;
 
-  $('#addInventoryBtn').onclick=function(){showModal('<h3>在庫商品を追加</h3><div class="form-row"><label>商品名</label><input id="invName"></div><div class="form-row"><label>現在庫</label><input id="invStock" type="number" value="0"></div><div class="form-row"><label>最低在庫</label><input id="invMin" type="number" value="0"></div><div class="form-row"><label>単位</label><input id="invUnit" value="個"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="saveInv">追加</button></div>',function(){$('#saveInv').onclick=function(){inventory.push({name:$('#invName').value||'未設定',stock:Number($('#invStock').value),min:Number($('#invMin').value),unit:$('#invUnit').value||'個'});save('ippukuInventory',inventory);closeModal();renderInventory()}})};
+  var addInventoryBtn=$('#addInventoryBtn');
+  if(addInventoryBtn)addInventoryBtn.onclick=function(){openInventoryEditor(-1)};
+
   function renderReserves(){$('#reserveList').innerHTML=reserves.length?reserves.map(function(r,i){return '<div class="reserve-card"><div><b>'+esc(r.item)+' ×'+r.qty+'</b><small>'+esc(r.name||'お客様')+' / 来店 '+esc(r.date)+' '+esc(r.time||'')+'</small></div><span class="status waiting">'+esc(r.date)+'</span><button class="ghost" data-del-res="'+i+'">完了</button></div>'}).join(''):'<div class="panel note">取り置きはありません。</div>';$$('[data-del-res]').forEach(function(b){b.onclick=function(){reserves.splice(Number(b.dataset.delRes),1);save('ippukuReserves',reserves);renderAll()}})}
   $('#addReserveBtn').onclick=function(){showModal('<h3>取り置き追加</h3><div class="form-row"><label>お客様名</label><input id="resName"></div><div class="form-row"><label>商品・銘柄</label><input id="resItem"></div><div class="form-row"><label>個数</label><input id="resQty" type="number" value="1"></div><div class="form-row"><label>来店日</label><input id="resDate" type="date"></div><div class="form-row"><label>時間</label><input id="resTime" type="time"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="saveRes">追加</button></div>',function(){$('#saveRes').onclick=function(){reserves.push({name:$('#resName').value,item:$('#resItem').value||'未設定',qty:Number($('#resQty').value)||1,date:$('#resDate').value,time:$('#resTime').value});save('ippukuReserves',reserves);closeModal();renderAll()}})};
 
