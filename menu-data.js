@@ -42,7 +42,7 @@ window.MENU_DATA = [
   {name:"コーヒーゼリーパフェ",category:"Dessert",price:550,image:"./assets/menu/coffee_jelly_parfait.webp"},
   {name:"コーヒーゼリー",category:"Dessert",price:330,image:"./assets/menu/coffee_jelly_parfait.webp",description:"コーヒーゼリーのみ"},
   {name:"こんがりワッフル",category:"Dessert",price:440,image:"./assets/menu/waffle.webp",description:"ソースを選べます",choices:[{label:"ソース",options:["チョコ","キャラメル","ベリー"]}]},
-  {name:"濃厚バニラアイス",category:"Dessert",price:380,image:"./assets/menu/vanilla_ice.webp",description:"ダブル（2個盛り）は30円引き",choices:[{label:"盛り方",options:[{label:"シングル",priceDelta:0},{label:"ダブル（2個盛り・30円引き）",priceDelta:350}]}]},
+  {name:"濃厚バニラアイス",category:"Dessert",price:380,image:"./assets/menu/vanilla_ice.webp",description:"ダブル（2個盛り）は30円引きで730円",choices:[{label:"盛り方",options:[{label:"シングル",priceDelta:0},{label:"ダブル（2個盛り・30円引き）",priceDelta:350}]}]},
 
   {name:"ナッツ",category:"Snack",price:220},
   {name:"チョコレート",category:"Snack",price:110},
