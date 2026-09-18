@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17130f">
+<title>いっぷく 店舗管理</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">喫煙カフェ いっぷく</div>
+      <h1 id="pageTitle">店舗ダッシュボード</h1>
+    </div>
+    <div class="top-actions">
+      <button class="ghost" id="openCustomer">注文画面</button>
+      <button class="icon-btn" id="refreshBtn" title="再読込">↻</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="page active" data-page="dashboard">
+      <div class="hero-grid">
+        <article class="metric primary"><span>期間売上</span><strong id="metricSales">-</strong><small>2026/01/01〜2026/09/18</small></article>
+        <article class="metric"><span>期間粗利</span><strong id="metricProfit">-</strong><small id="metricMargin">-</small></article>
+        <article class="metric"><span>販売点数</span><strong id="metricUnits">-</strong><small>返品除外前</small></article>
+        <article class="metric"><span>商品数</span><strong id="metricProducts">-</strong><small>Airレジ商品別売上</small></article>
+      </div>
+
+      <div class="section-head"><div><h2>今日の店舗</h2><p>注文・席状況を一画面で確認</p></div><button class="text-btn" data-go="seats">座席表を開く →</button></div>
+      <div class="quick-grid">
+        <article class="quick"><span>使用中の席</span><strong id="occupiedCount">0 / 14</strong></article>
+        <article class="quick"><span>未提供注文</span><strong id="pendingCount">0</strong></article>
+        <article class="quick"><span>今日のモバイル注文</span><strong id="todayOrderSales">¥0</strong></article>
+        <article class="quick"><span>取り置き</span><strong id="reserveCount">0</strong></article>
+      </div>
+
+      <div class="two-col">
+        <section class="panel">
+          <div class="panel-head"><h3>利益貢献 TOP5</h3><button class="text-btn" data-go="analytics">詳しく</button></div>
+          <div id="topProfitList" class="rank-list"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><h3>強化候補</h3><span class="badge">期間累計</span></div>
+          <div id="focusList" class="focus-list"></div>
+          <p class="note">月別推移はAirレジAPIまたは会計明細連携後に自動判定します。</p>
+        </section>
+      </div>
+    </section>
+
+    <section class="page" data-page="seats">
+      <div class="section-head"><div><h2>座席・注文管理</h2><p>席をタップすると注文内容を確認できます</p></div><div class="legend"><span><i class="dot free"></i>空席</span><span><i class="dot ordered"></i>注文あり</span><span><i class="dot preparing"></i>準備中</span><span><i class="dot served"></i>提供済</span></div></div>
+      <div class="seat-layout-wrap">
+        <div class="floorplan" id="floorplan">
+          <div class="counter-top">カウンター</div>
+          <div class="counter-left">カウンター</div>
+          <button class="seat counter-seat" data-seat="C01" style="left:43%;top:10%">C01</button>
+          <button class="seat counter-seat" data-seat="C02" style="left:64%;top:10%">C02</button>
+          <button class="seat counter-seat" data-seat="C03" style="left:9%;top:20%">C03</button>
+          <button class="seat counter-seat" data-seat="C04" style="left:9%;top:38%">C04</button>
+          <button class="seat counter-seat" data-seat="C05" style="left:9%;top:57%">C05</button>
+          <button class="seat counter-seat" data-seat="C06" style="left:9%;top:76%">C06</button>
+
+          <button class="table-box t1" data-table="T1"><span>T1</span><small>中央4名</small></button>
+          <button class="seat" data-seat="T1-01" style="left:34%;top:30%">T1-01</button>
+          <button class="seat" data-seat="T1-02" style="left:34%;top:47%">T1-02</button>
+          <button class="seat" data-seat="T1-03" style="left:60%;top:30%">T1-03</button>
+          <button class="seat" data-seat="T1-04" style="left:60%;top:47%">T1-04</button>
+
+          <button class="table-box t2" data-table="T2"><span>T2</span><small>右2名</small></button>
+          <button class="seat" data-seat="T2-01" style="left:82%;top:43%">T2-01</button>
+          <button class="seat" data-seat="T2-02" style="left:82%;top:66%">T2-02</button>
+
+          <button class="table-box t3" data-table="T3"><span>T3</span><small>下2名</small></button>
+          <button class="seat" data-seat="T3-01" style="left:52%;top:67%">T3-01</button>
+          <button class="seat" data-seat="T3-02" style="left:52%;top:90%">T3-02</button>
+          <div class="entrance">階段 / 入口</div>
+        </div>
+        <aside class="seat-detail" id="seatDetail">
+          <div class="empty-detail"><strong>席を選択</strong><span>注文内容・合計・提供状況を表示します</span></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" data-page="orders">
+      <div class="section-head"><div><h2>注文一覧</h2><p>新しい注文から順に表示</p></div><button class="primary-btn" id="demoOrderBtn">デモ注文を追加</button></div>
+      <div class="filter-row">
+        <button class="filter active" data-order-filter="all">すべて</button>
+        <button class="filter" data-order-filter="ordered">受付</button>
+        <button class="filter" data-order-filter="preparing">準備中</button>
+        <button class="filter" data-order-filter="served">提供済</button>
+        <button class="filter" data-order-filter="paid">会計済</button>
+      </div>
+      <div id="ordersList" class="orders-list"></div>
+    </section>
+
+    <section class="page" data-page="analytics">
+      <div class="section-head"><div><h2>売上分析</h2><p>Airレジ商品別売上 CSVをもとに集計</p></div><label class="upload-btn">CSVを読み込む<input id="csvInput" type="file" accept=".csv" hidden></label></div>
+      <div class="analytics-grid">
+        <section class="panel"><div class="panel-head"><h3>粗利TOP10</h3><span class="badge">商品</span></div><div id="profitTable"></div></section>
+        <section class="panel"><div class="panel-head"><h3>カテゴリー別</h3><span class="badge">売上 / 粗利</span></div><div id="categoryBars"></div></section>
+      </div>
+      <section class="panel">
+        <div class="panel-head"><h3>商品分析</h3><input id="productSearch" class="search" placeholder="商品名・カテゴリーで検索"></div>
+        <div class="table-scroll"><table><thead><tr><th>商品</th><th>カテゴリー</th><th>売上</th><th>販売数</th><th>粗利</th><th>粗利率</th><th>判定</th></tr></thead><tbody id="productTableBody"></tbody></table></div>
+      </section>
+      <section class="panel placeholder-panel">
+        <div><span class="big-icon">↗</span><h3>月別・曜日別・時間帯分析</h3><p>AirレジAPIまたは会計明細が接続されたら、前月比・急上昇商品・時間帯別売上をここに自動表示します。</p></div>
+      </section>
+    </section>
+
+    <section class="page" data-page="inventory">
+      <div class="section-head"><div><h2>在庫・発注</h2><p>現状は手動入力。API接続後に商品マスタと統合予定</p></div><button class="primary-btn" id="addInventoryBtn">＋ 商品追加</button></div>
+      <div id="inventoryList" class="inventory-list"></div>
+    </section>
+
+    <section class="page" data-page="reserve">
+      <div class="section-head"><div><h2>取り置き管理</h2><p>銘柄・個数・来店予定日をまとめて管理</p></div><button class="primary-btn" id="addReserveBtn">＋ 取り置き追加</button></div>
+      <div id="reserveList" class="reserve-list"></div>
+    </section>
+
+    <section class="page" data-page="settings">
+      <div class="section-head"><div><h2>設定</h2><p>Airレジ連携・商品・QRコード</p></div></div>
+      <div class="settings-grid">
+        <article class="panel setting-card"><div><h3>Airレジ API</h3><p>API仕様書が届いたらここを接続します。</p></div><span class="status waiting">仕様待ち</span></article>
+        <article class="panel setting-card"><div><h3>過去売上データ</h3><p>Airレジ商品別売上CSVを一度読み込むと、この端末に保存されます。</p></div><span class="status waiting">CSV対応</span></article>
+        <article class="panel setting-card"><div><h3>座席QR</h3><p>14席分のQRリンクを発行できます。</p></div><button class="ghost" id="showQrLinks">リンク表示</button></article>
+      </div>
+      <div class="panel" id="qrLinksPanel" style="display:none"><div class="panel-head"><h3>座席別注文URL</h3></div><div id="qrLinks" class="qr-links"></div></div>
+    </section>
+
+    <section class="page customer-page" data-page="customer">
+      <div class="customer-head"><div><span class="eyebrow">喫煙カフェ いっぷく</span><h2>モバイルオーダー</h2></div><div class="seat-pill">席 <strong id="customerSeat">未選択</strong></div></div>
+      <div id="customerMenu" class="menu-grid"></div>
+      <div class="cart-bar" id="cartBar"><div><small>カート</small><strong id="cartSummary">0点 / ¥0</strong></div><button class="primary-btn" id="checkoutBtn">注文内容を確認</button></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-item active" data-go="dashboard"><span>⌂</span><small>ホーム</small></button>
+    <button class="nav-item" data-go="seats"><span>▦</span><small>座席</small></button>
+    <button class="nav-item" data-go="orders"><span>☷</span><small>注文</small></button>
+    <button class="nav-item" data-go="analytics"><span>↗</span><small>分析</small></button>
+    <button class="nav-item" data-go="inventory"><span>□</span><small>在庫</small></button>
+    <button class="nav-item" data-go="reserve"><span>☆</span><small>取置</small></button>
+    <button class="nav-item" data-go="settings"><span>⚙</span><small>設定</small></button>
+  </nav>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script src="./sales-data.js"></script>
+<script src="./menu-data.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
