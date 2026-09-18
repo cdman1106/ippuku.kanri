@@ -415,3 +415,68 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .no-order-alert-seats small{font-size:9px;color:#ffb8ad}
 .no-order-alert-list p{margin:5px 0 0;font-size:10px;line-height:1.55;color:#e9aaa1}
 @media(max-width:560px){.no-order-alert-title{align-items:flex-start;flex-direction:column;gap:3px}.no-order-alert-seats button{min-height:40px}}
+
+
+/* White customer order theme */
+body.customer-mode{background:#fff;color:#221b16}
+body.customer-mode main{background:#fff}
+body.customer-mode .customer-page{background:#fff;color:#221b16}
+body.customer-mode .customer-head{background:rgba(255,255,255,.96);border-bottom:1px solid #e8e2dc;color:#221b16}
+body.customer-mode .customer-head .eyebrow{color:#8b7765}
+body.customer-mode .seat-pill{background:#f6f1eb;border-color:#dfd3c6;color:#3b2b1f}
+body.customer-mode .customer-category-filters{background:linear-gradient(180deg,rgba(255,255,255,.99) 72%,rgba(255,255,255,.92))}
+body.customer-mode .customer-filter{background:#fff;border-color:#d8cec4;color:#5f5147}
+body.customer-mode .customer-filter.active{background:#2f241b;border-color:#2f241b;color:#fff}
+body.customer-mode .customer-menu-head h3,
+body.customer-mode .menu-card h3{color:#221b16}
+body.customer-mode .customer-menu-head small,
+body.customer-mode .menu-card small,
+body.customer-mode .menu-meta{color:#7e6f63}
+body.customer-mode .menu-card{background:#fff;border-color:#e8e1da;box-shadow:0 5px 18px rgba(41,31,23,.07)}
+body.customer-mode .menu-card-tap{color:#221b16}
+body.customer-mode .menu-card-tap:active,
+body.customer-mode .menu-card-tap.just-added{background:#f7f3ef}
+body.customer-mode .menu-photo-wrap{background:#f2eee9}
+body.customer-mode .add-btn{background:#2f241b;color:#fff}
+body.customer-mode .one-drink-note{background:#fff8e9;border-color:#ead5ac;color:#3d3025}
+body.customer-mode .one-drink-note strong{color:#7b5b25}
+body.customer-mode .checkout-guide{background:#f7f4f0;border-color:#ded6ce;color:#3b322b}
+body.customer-mode .checkout-guide strong{color:#4d3a2d}
+body.customer-mode .night-charge-note{background:#f7f4f0;border-color:#ded6ce;color:#4b4038}
+body.customer-mode .customer-promo{background:#f8f5f1;border-color:#e4ddd6;color:#2b211b}
+body.customer-mode .promo-card{background:#fff;border-color:#e3dbd3;color:#2b211b}
+body.customer-mode .promo-copy p{color:#77695e}
+body.customer-mode .cart-bar{background:rgba(255,255,255,.98);border-top:1px solid #ddd5cd;color:#221b16;box-shadow:0 -8px 24px rgba(37,28,21,.08)}
+body.customer-mode .cart-bar small{color:#7d6e62}
+body.customer-mode .cart-bar .primary-btn{background:#2f241b;color:#fff}
+body.customer-mode .modal{background:#fff;color:#221b16;border-color:#ddd5cd}
+body.customer-mode .form-row label{color:#6f6258}
+body.customer-mode .form-row input,
+body.customer-mode .form-row select{background:#fff;color:#221b16;border-color:#d8cec4}
+body.customer-mode .cart-edit-row{background:#faf8f5;border-color:#e4ddd6}
+body.customer-mode .qty-btn{background:#fff;color:#2d241e;border-color:#d5cbc1}
+body.customer-mode .night-fee-info{color:#7a6b60}
+body.customer-mode .detail-total{color:#221b16}
+
+.drink-upsell-banner{margin:12px 0 16px;padding:14px;background:#fff7eb;border:1px solid #e7c995;border-radius:16px}
+.drink-upsell-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin-bottom:10px}
+.drink-upsell-head span{display:block;font-size:10px;color:#947347;font-weight:800}
+.drink-upsell-head strong{display:block;margin-top:3px;font-size:14px;color:#3b2a1d}
+.drink-upsell-head>small{font-size:9px;color:#8b7560;white-space:nowrap}
+.drink-upsell-scroll{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.drink-upsell-scroll::-webkit-scrollbar{display:none}
+.drink-upsell-card{flex:0 0 74%;display:grid;grid-template-columns:64px 1fr 34px;align-items:center;gap:9px;padding:8px;border:1px solid #eadfd2;border-radius:13px;background:#fff;color:#2a211b;text-align:left}
+.drink-upsell-card img{width:64px;height:54px;object-fit:cover;border-radius:9px}
+.drink-upsell-card span b,.drink-upsell-card span small{display:block}
+.drink-upsell-card span b{font-size:12px}.drink-upsell-card span small{margin-top:3px;font-size:11px;color:#8a6844}
+.drink-upsell-card i{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#2f241b;color:#fff;font-style:normal;font-weight:900}
+
+.checkout-upsell{margin:12px 0 14px;padding:12px;background:#fff7eb;border:1px solid #e7c995;border-radius:14px}
+.checkout-upsell-title span{display:block;font-size:10px;color:#947347;font-weight:800}
+.checkout-upsell-title strong{display:block;margin-top:2px;font-size:13px;color:#3b2a1d}
+.checkout-upsell-grid{display:grid;gap:8px;margin-top:9px}
+.checkout-upsell-grid button{display:grid;grid-template-columns:58px 1fr 30px;align-items:center;gap:9px;width:100%;padding:7px;border:1px solid #e5d9cc;border-radius:12px;background:#fff;color:#2b211a;text-align:left}
+.checkout-upsell-grid img{width:58px;height:50px;object-fit:cover;border-radius:8px}
+.checkout-upsell-grid span b,.checkout-upsell-grid span small{display:block}
+.checkout-upsell-grid span b{font-size:12px}.checkout-upsell-grid span small{font-size:10px;color:#8b6c4a;margin-top:3px}
+.checkout-upsell-grid i{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#2f241b;color:#fff;font-style:normal;font-weight:900}
