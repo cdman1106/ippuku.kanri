@@ -605,3 +605,47 @@ body.customer-mode .checkout-upsell-grid button{
   background:#fff;
   border-color:#e5d7c5
 }
+
+
+/* Checkout totals compact white cleanup */
+body.customer-mode .checkout-totals{
+  margin-top:14px;
+  padding:14px 0 0;
+  border-top:1px solid #ddd6cf;
+}
+body.customer-mode .checkout-totals>div:not(.detail-total){
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:5px 0;
+  font-size:13px;
+  color:#51473f;
+}
+body.customer-mode .night-fee-line{
+  margin:5px 0 2px;
+  padding:8px 10px!important;
+  background:#faf8fc;
+  border:1px solid #e8e2ec;
+  border-radius:10px;
+  color:#665d6e;
+}
+body.customer-mode .night-fee-line strong{color:#665d6e}
+body.customer-mode .night-fee-info{display:none!important}
+body.customer-mode .detail-total{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-top:8px;
+  padding:13px 0 2px;
+  border-top:1px solid #e6e0da;
+  font-size:20px;
+  color:#221b16;
+}
+body.customer-mode .detail-total span{font-size:20px}
+body.customer-mode .detail-total strong{
+  font-size:25px;
+  font-weight:900;
+  color:#221b16;
+}
+body.customer-mode .checkout-totals + .form-row{margin-top:18px}
