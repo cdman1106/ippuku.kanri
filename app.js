@@ -487,7 +487,9 @@
   function parseCSV(t){var out=[],row=[],v='',q=false;for(var i=0;i<t.length;i++){var c=t[i],n=t[i+1];if(q){if(c==='"'&&n==='"'){v+='"';i++}else if(c==='"')q=false;else v+=c}else{if(c==='"')q=true;else if(c===','){row.push(v);v=''}else if(c==='\n'){row.push(v.replace(/\r$/,''));out.push(row);row=[];v=''}else v+=c}}if(v||row.length){row.push(v);out.push(row)}return out}
 
   function renderInventory(){
-    $('#inventoryList').innerHTML=inventory.map(function(x,i){
+    var inventoryList=$('#inventoryList');
+    if(!inventoryList)return;
+    inventoryList.innerHTML=inventory.map(function(x,i){
       var hasStock=x.stock!==''&&x.stock!==null&&x.stock!==undefined&&!isNaN(Number(x.stock));
       var stock=hasStock?Number(x.stock):null;
       var low=hasStock&&stock<=Number(x.min||0);
@@ -578,7 +580,8 @@
       }
     );
   }
-  $('#inventoryLineBtn').onclick=openInventoryLineCopy;
+  var inventoryLineBtn=$('#inventoryLineBtn');
+  if(inventoryLineBtn)inventoryLineBtn.onclick=openInventoryLineCopy;
 
   $('#addInventoryBtn').onclick=function(){showModal('<h3>在庫商品を追加</h3><div class="form-row"><label>商品名</label><input id="invName"></div><div class="form-row"><label>現在庫</label><input id="invStock" type="number" value="0"></div><div class="form-row"><label>最低在庫</label><input id="invMin" type="number" value="0"></div><div class="form-row"><label>単位</label><input id="invUnit" value="個"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="saveInv">追加</button></div>',function(){$('#saveInv').onclick=function(){inventory.push({name:$('#invName').value||'未設定',stock:Number($('#invStock').value),min:Number($('#invMin').value),unit:$('#invUnit').value||'個'});save('ippukuInventory',inventory);closeModal();renderInventory()}})};
   function renderReserves(){$('#reserveList').innerHTML=reserves.length?reserves.map(function(r,i){return '<div class="reserve-card"><div><b>'+esc(r.item)+' ×'+r.qty+'</b><small>'+esc(r.name||'お客様')+' / 来店 '+esc(r.date)+' '+esc(r.time||'')+'</small></div><span class="status waiting">'+esc(r.date)+'</span><button class="ghost" data-del-res="'+i+'">完了</button></div>'}).join(''):'<div class="panel note">取り置きはありません。</div>';$$('[data-del-res]').forEach(function(b){b.onclick=function(){reserves.splice(Number(b.dataset.delRes),1);save('ippukuReserves',reserves);renderAll()}})}
