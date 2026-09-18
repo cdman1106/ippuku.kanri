@@ -61,7 +61,7 @@
     });
   }
   function bindOrderDeleteButtons(){
-    $('[data-delete-order]').forEach(function(b){
+    $$('[data-delete-order]').forEach(function(b){
       b.onclick=function(e){e.stopPropagation();deleteOrderById(b.dataset.deleteOrder)};
     });
   }
@@ -161,7 +161,7 @@
     box.style.display='block';
     box.innerHTML='<div class="promo-title-row"><div><span class="eyebrow">RECOMMENDED</span><h3>今、いっぷくでおすすめ</h3></div><small>気になったらそのまま追加できます</small></div>'+
       '<div class="promo-scroll">'+ps.map(function(p,i){var m=promoProduct(p.product);return '<article class="promo-card"><span class="promo-tag">'+esc(p.tag||'おすすめ')+'</span><div class="promo-copy"><h3>'+esc(p.headline||p.product)+'</h3><p>'+esc(p.copy||'ぜひ一度お試しください。')+'</p></div><div class="promo-product"><div><b>'+esc(p.product)+'</b><strong>'+yen(m?m.price:0)+'</strong></div><button class="promo-add" data-promo-add="'+esc(p.product)+'">これを注文 ＋</button></div></article>'}).join('')+'</div>';
-    $('[data-promo-add]').forEach(function(b){b.onclick=function(){var m=promoProduct(b.dataset.promoAdd);if(!m)return;addMenuItem(m,function(){b.textContent='追加しました ✓';setTimeout(function(){b.textContent='これを注文 ＋'},900)})}})
+    $$('[data-promo-add]').forEach(function(b){b.onclick=function(){var m=promoProduct(b.dataset.promoAdd);if(!m)return;addMenuItem(m,function(){b.textContent='追加しました ✓';setTimeout(function(){b.textContent='これを注文 ＋'},900)})}})
   }
   function renderPromoManager(){
     var menu=window.MENU_DATA||[];
