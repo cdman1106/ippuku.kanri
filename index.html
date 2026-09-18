@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#17130f">
 <title>いっぷく 店舗管理</title>
-<link rel="stylesheet" href="./styles.css?v=20260918-9">
+<link rel="stylesheet" href="./styles.css?v=20260918-10">
 </head>
 <body>
 <div id="app">
@@ -15,6 +15,7 @@
       <h1 id="pageTitle">店舗ダッシュボード</h1>
     </div>
     <div class="top-actions">
+      <button class="ghost sound-enable" id="enableOrderSound">🔔 通知音ON</button>
       <button class="ghost" id="openCustomer">注文画面</button>
       <button class="icon-btn" id="refreshBtn" title="再読込">↻</button>
     </div>
@@ -168,12 +169,23 @@
   </nav>
 </div>
 
+<div class="order-alarm" id="orderAlarm" aria-live="assertive" aria-hidden="true">
+  <div class="order-alarm-card">
+    <div class="alarm-pulse">!</div>
+    <div class="alarm-eyebrow">NEW ORDER</div>
+    <h2>新しい注文が入りました</h2>
+    <div class="alarm-seat">席 <strong id="alarmSeat">--</strong></div>
+    <div class="alarm-summary" id="alarmSummary"></div>
+    <button class="alarm-stop" id="stopOrderAlarm">音を止める</button>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal" id="modal"></div>
 </div>
 
 <script src="./sales-data.js"></script>
 <script src="./menu-data.js?v=20260918-5"></script>
-<script src="./app.js?v=20260918-9"></script>
+<script src="./app.js?v=20260918-10"></script>
 </body>
 </html>
