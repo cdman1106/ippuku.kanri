@@ -14,6 +14,7 @@
     {product:'キャラメルマキアート',tag:'甘めが好きな方へ',headline:'少し贅沢な一杯を。',copy:'ゆっくり過ごしたい時におすすめのカフェメニューです。',active:true}
   ]);
   var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', customerSeat=new URLSearchParams(location.search).get('seat')||localStorage.getItem('ippukuCustomerSeat')||'';
+  var seatAccess={}, customerSeatOpen=true, customerSeatTimer=null;
   if(!inventory.length) inventory=[{name:'コーヒー豆',stock:4,min:2,unit:'袋'},{name:'ホットサンド用パン',stock:18,min:10,unit:'枚'},{name:'紙コップ',stock:52,min:30,unit:'個'}];
 
   var audioCtx=null, alarmTimer=null, alarmActive=false, soundEnabled=false;
@@ -136,8 +137,10 @@
     backendChecked=true;
     backendReady=!!(result.ok&&result.data&&result.data.database);
     if(backendReady){
+      await loadSeatAccess();
       await syncOrdersFromServer(true);
       if(!serverSyncTimer)serverSyncTimer=setInterval(function(){syncOrdersFromServer(false)},2000);
+      if(document.body.classList.contains('customer-mode'))startCustomerSeatWatch();
     }
   }
 
@@ -180,13 +183,72 @@
   }
 
 
+  async function loadSeatAccess(){
+    if(!backendReady)return;
+    var result=await apiRequest('/api/seats');
+    if(result.ok&&result.data&&result.data.seats){
+      seatAccess=result.data.seats;
+      renderSeats();
+      if(selectedSeat)renderSeatDetail(selectedSeat);
+    }
+  }
+
+  async function setSeatOpen(seat,open){
+    if(!backendReady){
+      alert('サーバーに接続できていないため変更できません。');
+      return;
+    }
+    var result=await apiRequest('/api/seats/'+encodeURIComponent(seat),{
+      method:'PATCH',
+      body:JSON.stringify({open:open})
+    });
+    if(!result.ok){
+      alert('席の注文受付状態を変更できませんでした。');
+      return;
+    }
+    seatAccess[seat]=open;
+    renderSeats();
+    renderSeatDetail(seat);
+  }
+
+  async function refreshCustomerSeatAccess(showMessage){
+    if(!customerSeat||!backendReady)return true;
+    var result=await apiRequest('/api/seats/'+encodeURIComponent(customerSeat));
+    if(!result.ok)return true;
+    var wasOpen=customerSeatOpen;
+    customerSeatOpen=result.data.open!==false;
+    var note=$('#seatClosedNotice');
+    if(note)note.style.display=customerSeatOpen?'none':'block';
+    var checkout=$('#checkoutBtn');
+    if(checkout){
+      checkout.disabled=!customerSeatOpen;
+      checkout.textContent=customerSeatOpen?'注文内容を確認':'この席は注文受付終了';
+    }
+    $('.menu-card-tap,.promo-add').forEach(function(b){b.disabled=!customerSeatOpen});
+    if(showMessage&&wasOpen&&!customerSeatOpen){
+      alert('この席の注文受付は終了しました。');
+    }
+    return customerSeatOpen;
+  }
+
+  function startCustomerSeatWatch(){
+    if(customerSeatTimer){clearInterval(customerSeatTimer);customerSeatTimer=null}
+    if(!customerSeat||!backendReady)return;
+    refreshCustomerSeatAccess(false);
+    customerSeatTimer=setInterval(function(){refreshCustomerSeatAccess(true)},4000);
+  }
+
+  function stopCustomerSeatWatch(){
+    if(customerSeatTimer){clearInterval(customerSeatTimer);customerSeatTimer=null}
+  }
+
   function page(name){
     $$('.page').forEach(function(p){p.classList.toggle('active',p.dataset.page===name)});
     $$('.nav-item').forEach(function(b){b.classList.toggle('active',b.dataset.go===name)});
     $('#bottomNav').style.display=name==='customer'?'none':'flex'; $('.topbar').style.display=name==='customer'?'none':'flex'; document.body.classList.toggle('customer-mode',name==='customer');
     var t={dashboard:'店舗ダッシュボード',seats:'座席・注文管理',orders:'注文一覧',analytics:'売上分析',inventory:'在庫・発注',reserve:'取り置き管理',settings:'設定'};
     if(t[name]) $('#pageTitle').textContent=t[name];
-    if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory') renderInventory(); if(name==='reserve') renderReserves(); if(name==='customer') renderCustomer();
+    if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory') renderInventory(); if(name==='reserve') renderReserves(); if(name==='customer'){renderCustomer();startCustomerSeatWatch()}else{stopCustomerSeatWatch()}
     window.scrollTo(0,0);
   }
   $$('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){if(location.hash!=='#order')location.hash='order';page('customer')}; $('#refreshBtn').onclick=renderAll;
@@ -207,7 +269,12 @@
 
   function latest(seat){return orders.filter(function(o){return o.seat===seat&&o.status!=='paid'}).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)})[0]}
   function renderSeats(){
-    $$('.seat').forEach(function(b){var o=latest(b.dataset.seat);b.dataset.status=o?o.status:'free';b.classList.toggle('selected',selectedSeat===b.dataset.seat);b.innerHTML=esc(b.dataset.seat)+(o?'<br><small>'+LABEL[o.status]+'</small>':'')});
+    $('.seat').forEach(function(b){
+      var seat=b.dataset.seat,o=latest(seat),isOpen=seatAccess[seat]!==false;
+      b.dataset.status=isOpen?(o?o.status:'free'):'closed';
+      b.classList.toggle('selected',selectedSeat===seat);
+      b.innerHTML=esc(seat)+(!isOpen?'<br><small>注文停止</small>':(o?'<br><small>'+LABEL[o.status]+'</small>':''));
+    });
     if(selectedSeat) renderSeatDetail(selectedSeat);
   }
   $$('.seat').forEach(function(b){b.onclick=function(){selectedSeat=b.dataset.seat;renderSeats()}});
@@ -221,12 +288,17 @@
     var paidOrders=seatOrders.filter(function(o){return o.status==='paid'}).slice(0,10);
 
     if(!seatOrders.length){
-      box.innerHTML='<div class="detail-head"><h3>'+esc(seat)+'</h3><span class="status-chip">空席</span></div><div class="empty-detail"><strong>注文はありません</strong><span>この席の注文が入ると、ここに履歴として残ります。</span><button class="primary-btn" id="seatDemo">この席にデモ注文</button></div>';
+      var isOpen=seatAccess[seat]!==false;
+      box.innerHTML='<div class="detail-head"><h3>'+esc(seat)+'</h3><span class="status-chip '+(isOpen?'':'closed')+'">'+(isOpen?'空席・受付中':'注文停止中')+'</span></div>'+
+        '<div class="seat-access-control '+(isOpen?'open':'closed')+'"><div><strong>'+(isOpen?'この席は注文受付中':'この席は注文停止中')+'</strong><span>'+(isOpen?'退店したら停止してください。':'次のお客様が着席したら受付を開始してください。')+'</span></div><button class="'+(isOpen?'danger-btn':'primary-btn')+'" id="toggleSeatAccess">'+(isOpen?'退店・注文を停止':'注文受付を開始')+'</button></div>'+
+        '<div class="empty-detail"><strong>注文はありません</strong><span>この席の注文が入ると、ここに履歴として残ります。</span><button class="primary-btn" id="seatDemo">この席にデモ注文</button></div>';
+      $('#toggleSeatAccess').onclick=function(){setSeatOpen(seat,!isOpen)};
       $('#seatDemo').onclick=function(){demo(seat)};
       return;
     }
 
     var activeTotal=activeOrders.reduce(function(sum,o){return sum+Number(o.total||0)},0);
+    var isOpen=seatAccess[seat]!==false;
 
     function seatOrderBlock(o,index,isPaid){
       return '<article class="seat-order-history '+(index===0&&!isPaid?'latest-order':'')+'">'+
@@ -242,14 +314,17 @@
     }
 
     box.innerHTML=
-      '<div class="detail-head"><div><h3>'+esc(seat)+'</h3><span class="detail-meta">現在の注文 '+activeOrders.length+'件</span></div><span class="status-chip '+(activeOrders[0]?activeOrders[0].status:'paid')+'">'+(activeOrders.length?'注文あり':'会計済')+'</span></div>'+
+      '<div class="detail-head"><div><h3>'+esc(seat)+'</h3><span class="detail-meta">現在の注文 '+activeOrders.length+'件</span></div><span class="status-chip '+(isOpen?(activeOrders[0]?activeOrders[0].status:'paid'):'closed')+'">'+(isOpen?(activeOrders.length?'注文あり':'注文受付中'):'注文停止中')+'</span></div>'+
+      '<div class="seat-access-control '+(isOpen?'open':'closed')+'"><div><strong>'+(isOpen?'この席は注文受付中':'この席は注文停止中')+'</strong><span>'+(isOpen?'退店したら停止してください。停止後はお客様のスマホから注文できません。':'次のお客様が着席したら受付を開始してください。')+'</span></div><button class="'+(isOpen?'danger-btn':'primary-btn')+'" id="toggleSeatAccess">'+(isOpen?'退店・注文を停止':'注文受付を開始')+'</button></div>'+
       (activeOrders.length?'<div class="seat-running-total"><span>現在の席合計</span><strong>'+yen(activeTotal)+'</strong></div>':'')+
       '<div class="seat-history-section"><div class="seat-history-title"><strong>現在の注文</strong><span>'+activeOrders.length+'件</span></div>'+
       (activeOrders.length?activeOrders.map(function(o,i){return seatOrderBlock(o,i,false)}).join(''):'<p class="note">未会計の注文はありません。</p>')+
       '</div>'+
       (paidOrders.length?'<div class="seat-history-section paid-history"><div class="seat-history-title"><strong>過去の注文</strong><span>直近'+paidOrders.length+'件</span></div>'+paidOrders.map(function(o,i){return seatOrderBlock(o,i,true)}).join('')+'</div>':'');
 
-    $$('[data-seat-order-id]').forEach(function(b){
+    var toggle=$('#toggleSeatAccess');
+    if(toggle)toggle.onclick=function(){setSeatOpen(seat,!isOpen)};
+    $('[data-seat-order-id]').forEach(function(b){
       b.onclick=function(){
         var o=orders.find(function(x){return String(x.id)===String(b.dataset.seatOrderId)});
         if(o)setOrderStatus(o,b.dataset.seatOrderStatus);
@@ -411,6 +486,7 @@
     renderCart();
   }
   function addMenuItem(item,done){
+    if(!customerSeatOpen){alert('この席の注文受付は終了しました。');return}
     if(!item.choices||!item.choices.length){
       pushCart(item,item.fixedOption||'',0); if(done)done(); return;
     }
@@ -487,7 +563,11 @@
       }catch(e){console.error('order signal failed',e)}
     },0);
   }
-  function openCartModal(){
+  async function openCartModal(){
+    if(backendReady){
+      var allowed=await refreshCustomerSeatAccess(false);
+      if(!allowed){alert('この席の注文受付は終了しました。');return}
+    }
     if(!cart.length){alert('商品を選んでください');return}
     function draw(){
       var amounts=cartAmounts(cart);
@@ -527,6 +607,11 @@
               method:'POST',
               body:JSON.stringify(payload)
             });
+            if(result.status===403&&result.data&&result.data.error==='SEAT_CLOSED'){
+              customerSeatOpen=false;
+              refreshCustomerSeatAccess(false);
+              throw new Error('SEAT_CLOSED');
+            }
             if(!result.ok||!result.data||!result.data.order)throw new Error('SERVER_ORDER_FAILED');
             newOrder=result.data.order;
             orders=[newOrder].concat(orders.filter(function(x){return String(x.id)!==String(newOrder.id)}));
@@ -559,7 +644,12 @@
         }catch(e){
           console.error('order submit failed',e);
           if(btn){btn.disabled=false;btn.textContent='注文する'}
-          alert('注文処理でエラーが発生しました。もう一度お試しください。');
+          if(e&&e.message==='SEAT_CLOSED'){
+            closeModal();
+            alert('この席の注文受付は終了しました。スタッフへお声がけください。');
+          }else{
+            alert('注文処理でエラーが発生しました。もう一度お試しください。');
+          }
         }
       };
     }
