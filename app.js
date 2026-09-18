@@ -48,8 +48,7 @@
     });
   }
   function startOrderAlarm(order){
-    if(!order)return;
-    if(document.body.classList.contains('customer-mode')&&!soundEnabled)return;
+    if(!order||document.body.classList.contains('customer-mode'))return;
     var overlay=$('#orderAlarm');
     if(!overlay)return;
     $('#alarmSeat').textContent=order.seat||'--';
@@ -348,9 +347,8 @@
         orders.push(newOrder);
         save('ippukuOrders',orders);
         var signal={id:newOrder.id,seat:newOrder.seat,items:newOrder.items,total:newOrder.total,ts:Date.now()};
-        localStorage.setItem('ippukuOrderSignal',JSON.stringify(signal));
+        try{localStorage.setItem('ippukuOrderSignal',JSON.stringify(signal))}catch(e){}
         if(orderChannel)try{orderChannel.postMessage(signal)}catch(e){}
-        if(soundEnabled)startOrderAlarm(newOrder);
         cart=[];closeModal();alert('注文を受け付けました。\n\nお会計の際は1階へ行き、席番号「'+customerSeat+'」を1階スタッフにお伝えください。');renderCart();renderAll();
       };
     }
