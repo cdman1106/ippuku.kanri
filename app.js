@@ -9,6 +9,10 @@
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]})}
   function time(v){var d=new Date(v);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
   var sales=load('ippukuSales',window.SALES_DATA||[]), orders=load('ippukuOrders',[]), inventory=load('ippukuInventory',[]), reserves=load('ippukuReserves',[]);
+  var promos=load('ippukuPromos',[
+    {product:'コーヒー',tag:'いっぷくおすすめ',headline:'まずは、ほっと一杯。',copy:'喫煙時間のお供に。ゆっくり過ごしたい時の定番です。',active:true},
+    {product:'ポパイサンド',tag:'小腹におすすめ',headline:'ドリンクと一緒にどうぞ。',copy:'ちょっと食べたい時にちょうどいい、人気の軽食です。',active:true}
+  ]);
   var selectedSeat='', orderFilter='all', cart=[], customerSeat=new URLSearchParams(location.search).get('seat')||localStorage.getItem('ippukuCustomerSeat')||'';
   if(!inventory.length) inventory=[{name:'コーヒー豆',stock:4,min:2,unit:'袋'},{name:'ホットサンド用パン',stock:18,min:10,unit:'枚'},{name:'紙コップ',stock:52,min:30,unit:'個'}];
 
@@ -105,9 +109,66 @@
   function renderReserves(){$('#reserveList').innerHTML=reserves.length?reserves.map(function(r,i){return '<div class="reserve-card"><div><b>'+esc(r.item)+' ×'+r.qty+'</b><small>'+esc(r.name||'お客様')+' / 来店 '+esc(r.date)+' '+esc(r.time||'')+'</small></div><span class="status waiting">'+esc(r.date)+'</span><button class="ghost" data-del-res="'+i+'">完了</button></div>'}).join(''):'<div class="panel note">取り置きはありません。</div>';$$('[data-del-res]').forEach(function(b){b.onclick=function(){reserves.splice(Number(b.dataset.delRes),1);save('ippukuReserves',reserves);renderAll()}})}
   $('#addReserveBtn').onclick=function(){showModal('<h3>取り置き追加</h3><div class="form-row"><label>お客様名</label><input id="resName"></div><div class="form-row"><label>商品・銘柄</label><input id="resItem"></div><div class="form-row"><label>個数</label><input id="resQty" type="number" value="1"></div><div class="form-row"><label>来店日</label><input id="resDate" type="date"></div><div class="form-row"><label>時間</label><input id="resTime" type="time"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="saveRes">追加</button></div>',function(){$('#saveRes').onclick=function(){reserves.push({name:$('#resName').value,item:$('#resItem').value||'未設定',qty:Number($('#resQty').value)||1,date:$('#resDate').value,time:$('#resTime').value});save('ippukuReserves',reserves);closeModal();renderAll()}})};
 
-  function renderCustomer(){if(!customerSeat){showModal('<h3>席番号を選択</h3><div class="form-row"><select id="seatSelect">'+SEATS.map(function(s){return '<option>'+s+'</option>'}).join('')+'</select></div><div class="modal-actions"><button class="primary-btn" id="seatChoose">この席で注文</button></div>',function(){$('#seatChoose').onclick=function(){customerSeat=$('#seatSelect').value;localStorage.setItem('ippukuCustomerSeat',customerSeat);closeModal();renderCustomer()}})}$('#customerSeat').textContent=customerSeat||'未選択';var m=window.MENU_DATA||[];$('#customerMenu').innerHTML=m.map(function(x,i){return '<article class="menu-card"><div><small>'+esc(x.category)+'</small><h3>'+esc(x.name)+'</h3></div><div class="menu-bottom"><strong>'+yen(x.price)+'</strong><button class="add-btn" data-add="'+i+'">＋</button></div></article>'}).join('');$$('[data-add]').forEach(function(b){b.onclick=function(){var x=m[Number(b.dataset.add)],f=cart.find(function(y){return y.name===x.name});if(f)f.qty++;else cart.push({name:x.name,category:x.category,price:x.price,qty:1});renderCart()}});renderCart()}
+
+  function promoProduct(name){return (window.MENU_DATA||[]).find(function(x){return x.name===name})}
+  function autoPromoCandidates(){
+    var menu=window.MENU_DATA||[];
+    var matched=sales.filter(function(p){return menu.some(function(m){return m.name===p.name})&&p.sales>0&&p.grossProfit>0})
+      .sort(function(a,b){
+        var as=(a.grossProfit||0)*0.55+(a.units||0)*80+Math.max(0,a.margin||0)*300;
+        var bs=(b.grossProfit||0)*0.55+(b.units||0)*80+Math.max(0,b.margin||0)*300;
+        return bs-as;
+      }).slice(0,4);
+    return matched.map(function(p){return p.name});
+  }
+  function defaultPromoCopy(name){
+    var m=promoProduct(name), cat=m?m.category:'';
+    if(cat.indexOf('スイーツ')>=0||cat.indexOf('軽食')>=0)return {tag:'一緒にどうぞ',headline:'小腹が空いたら、これ。',copy:'ドリンクと相性のいい一品です。ひと休みのお供にどうぞ。'};
+    if(cat.indexOf('カフェ')>=0)return {tag:'いっぷくおすすめ',headline:'もう一杯、ゆっくり。',copy:'喫煙時間のお供に。ゆっくり過ごしたい時におすすめです。'};
+    return {tag:'スタッフおすすめ',headline:'今、試してほしい一品。',copy:'いっぷくからのおすすめです。ぜひ一度お試しください。'};
+  }
+  function activePromos(){
+    var list=promos.filter(function(p){return p.active!==false&&promoProduct(p.product)});
+    if(list.length)return list.slice(0,3);
+    var auto=autoPromoCandidates();
+    if(!auto.length)auto=(window.MENU_DATA||[]).slice(0,2).map(function(x){return x.name});
+    return auto.slice(0,3).map(function(name){var c=defaultPromoCopy(name);return {product:name,tag:c.tag,headline:c.headline,copy:c.copy,active:true}});
+  }
+  function renderCustomerPromos(){
+    var box=$('#customerPromo'); if(!box)return;
+    var ps=activePromos();
+    if(!ps.length){box.innerHTML='';box.style.display='none';return}
+    box.style.display='block';
+    box.innerHTML='<div class="promo-title-row"><div><span class="eyebrow">RECOMMENDED</span><h3>今、いっぷくでおすすめ</h3></div><small>気になったらそのまま追加できます</small></div>'+
+      '<div class="promo-scroll">'+ps.map(function(p,i){var m=promoProduct(p.product);return '<article class="promo-card"><span class="promo-tag">'+esc(p.tag||'おすすめ')+'</span><div class="promo-copy"><h3>'+esc(p.headline||p.product)+'</h3><p>'+esc(p.copy||'ぜひ一度お試しください。')+'</p></div><div class="promo-product"><div><b>'+esc(p.product)+'</b><strong>'+yen(m?m.price:0)+'</strong></div><button class="promo-add" data-promo-add="'+esc(p.product)+'">これを注文 ＋</button></div></article>'}).join('')+'</div>';
+    $('[data-promo-add]').forEach(function(b){b.onclick=function(){var m=promoProduct(b.dataset.promoAdd);if(!m)return;var f=cart.find(function(y){return y.name===m.name});if(f)f.qty++;else cart.push({name:m.name,category:m.category,price:m.price,qty:1});renderCart();b.textContent='追加しました ✓';setTimeout(function(){b.textContent='これを注文 ＋'},900)}})
+  }
+  function renderPromoManager(){
+    var menu=window.MENU_DATA||[];
+    var candidates=autoPromoCandidates();
+    var rows=promos.map(function(p,i){return '<div class="promo-manage-row"><div><b>'+esc(p.product)+'</b><small>'+esc(p.tag||'おすすめ')+' / '+esc(p.headline||'')+'</small></div><button class="ghost" data-edit-promo="'+i+'">編集</button><button class="ghost" data-del-promo="'+i+'">削除</button></div>'}).join('');
+    showModal('<h3>販促POP管理</h3><p class="note">ここで登録した商品を、お客様のモバイルオーダー上部で目立たせます。粗利などの内部情報はお客様には表示しません。</p>'+
+      (candidates.length?'<div class="promo-suggest"><b>分析からの候補</b><p>'+candidates.map(function(n){return '<button class="filter" data-auto-promo="'+esc(n)+'">'+esc(n)+'</button>'}).join(' ')+'</p></div>':'')+
+      '<div class="promo-manage-list">'+(rows||'<p class="note">POPはまだありません。</p>')+'</div><div class="modal-actions"><button class="ghost" data-close>閉じる</button><button class="primary-btn" id="addPromo">＋ POP追加</button></div>',function(){
+        $('#addPromo').onclick=function(){editPromo(-1)};
+        $('[data-edit-promo]').forEach(function(b){b.onclick=function(){editPromo(Number(b.dataset.editPromo))}});
+        $('[data-del-promo]').forEach(function(b){b.onclick=function(){promos.splice(Number(b.dataset.delPromo),1);save('ippukuPromos',promos);closeModal();renderPromoManager()}});
+        $('[data-auto-promo]').forEach(function(b){b.onclick=function(){var n=b.dataset.autoPromo;if(!promos.some(function(p){return p.product===n})){var c=defaultPromoCopy(n);promos.push({product:n,tag:c.tag,headline:c.headline,copy:c.copy,active:true});save('ippukuPromos',promos)}closeModal();renderPromoManager()}});
+      });
+  }
+  function editPromo(index){
+    var menu=window.MENU_DATA||[], current=index>=0?promos[index]:null, selected=current?current.product:(menu[0]?menu[0].name:'');
+    var c=current||defaultPromoCopy(selected);
+    showModal('<h3>'+(index>=0?'POPを編集':'POPを追加')+'</h3><div class="form-row"><label>宣伝する商品</label><select id="promoProduct">'+menu.map(function(m){return '<option '+(m.name===selected?'selected':'')+'>'+esc(m.name)+'</option>'}).join('')+'</select></div><div class="form-row"><label>小見出し</label><input id="promoTag" value="'+esc(c.tag||'')+'" placeholder="例：スタッフおすすめ"></div><div class="form-row"><label>大きな見出し</label><input id="promoHeadline" value="'+esc(c.headline||'')+'" placeholder="例：まずは、ほっと一杯。"></div><div class="form-row"><label>宣伝文</label><input id="promoCopy" value="'+esc(c.copy||'')+'" placeholder="商品の魅力を短く"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="savePromo">保存</button></div>',function(){
+      $('#promoProduct').onchange=function(){var d=defaultPromoCopy(this.value);$('#promoTag').value=d.tag;$('#promoHeadline').value=d.headline;$('#promoCopy').value=d.copy};
+      $('#savePromo').onclick=function(){var p={product:$('#promoProduct').value,tag:$('#promoTag').value||'おすすめ',headline:$('#promoHeadline').value||$('#promoProduct').value,copy:$('#promoCopy').value||'ぜひ一度お試しください。',active:true};if(index>=0)promos[index]=p;else promos.push(p);save('ippukuPromos',promos);closeModal();};
+    });
+  }
+
+  function renderCustomer(){if(!customerSeat){showModal('<h3>席番号を選択</h3><div class="form-row"><select id="seatSelect">'+SEATS.map(function(s){return '<option>'+s+'</option>'}).join('')+'</select></div><div class="modal-actions"><button class="primary-btn" id="seatChoose">この席で注文</button></div>',function(){$('#seatChoose').onclick=function(){customerSeat=$('#seatSelect').value;localStorage.setItem('ippukuCustomerSeat',customerSeat);closeModal();renderCustomer()}})}$('#customerSeat').textContent=customerSeat||'未選択';renderCustomerPromos();var m=window.MENU_DATA||[];$('#customerMenu').innerHTML=m.map(function(x,i){return '<article class="menu-card"><div><small>'+esc(x.category)+'</small><h3>'+esc(x.name)+'</h3></div><div class="menu-bottom"><strong>'+yen(x.price)+'</strong><button class="add-btn" data-add="'+i+'">＋</button></div></article>'}).join('');$$('[data-add]').forEach(function(b){b.onclick=function(){var x=m[Number(b.dataset.add)],f=cart.find(function(y){return y.name===x.name});if(f)f.qty++;else cart.push({name:x.name,category:x.category,price:x.price,qty:1});renderCart()}});renderCart()}
   function renderCart(){var q=cart.reduce(function(a,i){return a+i.qty},0),t=cart.reduce(function(a,i){return a+i.price*i.qty},0);$('#cartSummary').textContent=q+'点 / '+yen(t)}
   $('#checkoutBtn').onclick=function(){if(!cart.length){alert('商品を選んでください');return}showModal('<h3>注文内容</h3>'+cart.map(function(i){return '<div class="order-line"><span>'+esc(i.name)+' ×'+i.qty+'</span><b>'+yen(i.price*i.qty)+'</b></div>'}).join('')+'<div class="detail-total"><span>合計</span><strong>'+yen(cart.reduce(function(a,i){return a+i.price*i.qty},0))+'</strong></div><div class="form-row"><label>スタッフへのメモ</label><input id="orderNote" placeholder="例：氷少なめ"></div><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="primary-btn" id="submitOrder">注文する</button></div>',function(){$('#submitOrder').onclick=function(){var t=cart.reduce(function(a,i){return a+i.price*i.qty},0);orders.push({id:String(Date.now()),seat:customerSeat,status:'ordered',items:cart.slice(),total:t,createdAt:new Date().toISOString(),note:$('#orderNote').value});save('ippukuOrders',orders);cart=[];closeModal();alert('注文を受け付けました');renderCart()}})};
+  $('#managePromos').onclick=renderPromoManager;
   $('#showQrLinks').onclick=function(){var p=$('#qrLinksPanel');p.style.display=p.style.display==='none'?'block':'none';var base=location.href.split('?')[0].split('#')[0];$('#qrLinks').innerHTML=SEATS.map(function(s){return '<div class="qr-link"><b>'+s+'</b><br>'+base+'?seat='+encodeURIComponent(s)+'#order</div>'}).join('')};
   function showModal(html,after){$('#modal').innerHTML=html;$('#modalBackdrop').classList.add('show');$$('[data-close]').forEach(function(b){b.onclick=closeModal});if(after)after()} function closeModal(){$('#modalBackdrop').classList.remove('show')} $('#modalBackdrop').onclick=function(e){if(e.target===$('#modalBackdrop'))closeModal()};
   function renderAll(){renderDashboard();renderOrders();renderAnalytics();renderInventory();renderReserves();renderSeats()}
