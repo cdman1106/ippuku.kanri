@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#17130f">
 <title>いっぷく 店舗管理</title>
-<link rel="stylesheet" href="./styles.css?v=20260918-10">
+<link rel="stylesheet" href="./styles.css?v=20260918-11">
 </head>
 <body>
 <div id="app">
@@ -176,7 +176,7 @@
     <h2>新しい注文が入りました</h2>
     <div class="alarm-seat">席 <strong id="alarmSeat">--</strong></div>
     <div class="alarm-summary" id="alarmSummary"></div>
-    <button class="alarm-stop" id="stopOrderAlarm">音を止める</button>
+    <button class="alarm-stop" id="stopOrderAlarm"><span class="alarm-stop-icon">🔇</span><span class="alarm-stop-main">音を止める</span><small>タップして通知を停止</small></button>
   </div>
 </div>
 
@@ -186,6 +186,6 @@
 
 <script src="./sales-data.js"></script>
 <script src="./menu-data.js?v=20260918-5"></script>
-<script src="./app.js?v=20260918-10"></script>
+<script src="./app.js?v=20260918-11"></script>
 </body>
 </html>
