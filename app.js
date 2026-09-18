@@ -45,8 +45,56 @@
   $$('[data-order-filter]').forEach(function(b){b.onclick=function(){orderFilter=b.dataset.orderFilter;$$('[data-order-filter]').forEach(function(x){x.classList.toggle('active',x===b)});renderOrders()}}); $('#demoOrderBtn').onclick=function(){demo(SEATS[Math.floor(Math.random()*SEATS.length)])};
   function demo(seat){var m=(window.MENU_DATA||[]).slice(0,8);if(!m.length)return;var p=[m[Math.floor(Math.random()*m.length)],m[Math.floor(Math.random()*m.length)]],items=p.map(function(x){return {name:x.name,price:x.price,qty:1}});orders.push({id:String(Date.now()),seat:seat,status:'ordered',items:items,total:items.reduce(function(a,i){return a+i.price*i.qty},0),createdAt:new Date().toISOString(),note:''});save('ippukuOrders',orders);selectedSeat=seat;renderAll()}
 
+
+  function renderStrategy(){
+    var summary=$('#strategySummary'), cards=$('#strategyCards');
+    if(!summary||!cards)return;
+    if(!sales.length){
+      summary.innerHTML='<div class="strategy-empty">Airレジの商品別売上CSVを読み込むと、強化すべき商品・カテゴリーを自動提案します。</div>';
+      cards.innerHTML=''; return;
+    }
+    var cats={};
+    sales.forEach(function(p){
+      var k=p.category||'未設定';
+      if(!cats[k])cats[k]={name:k,sales:0,profit:0,units:0,products:0};
+      cats[k].sales+=Number(p.sales||0);cats[k].profit+=Number(p.grossProfit||0);cats[k].units+=Number(p.units||0);cats[k].products++;
+    });
+    var ca=Object.keys(cats).map(function(k){var x=cats[k];x.margin=x.sales?x.profit/x.sales*100:0;return x});
+    var topProfitCat=ca.slice().sort(function(a,b){return b.profit-a.profit})[0];
+    var highMarginCat=ca.filter(function(x){return x.sales>0}).sort(function(a,b){return b.margin-a.margin})[0];
+
+    var positive=sales.filter(function(p){return p.sales>0&&p.grossProfit>0});
+    var maxProfit=Math.max.apply(null,positive.map(function(p){return p.grossProfit}).concat([1]));
+    var maxUnits=Math.max.apply(null,positive.map(function(p){return p.units}).concat([1]));
+    var scored=positive.map(function(p){
+      var margin=Math.max(0,Math.min(100,Number(p.margin||0)))/100;
+      var profitScore=p.grossProfit/maxProfit, unitScore=p.units/maxUnits;
+      var score=profitScore*.5+margin*.3+unitScore*.2;
+      return {p:p,score:score};
+    }).sort(function(a,b){return b.score-a.score});
+
+    var heroes=scored.filter(function(x){return x.p.margin>=35}).slice(0,4).map(function(x){return x.p});
+    var traffic=positive.filter(function(p){return p.margin<20&&p.units>=20}).sort(function(a,b){return b.units-a.units}).slice(0,3);
+    var premium=positive.filter(function(p){return p.margin>=35&&p.units<80&&p.grossProfit>=30000}).sort(function(a,b){return b.grossProfit-a.grossProfit}).slice(0,3);
+    var weak=sales.filter(function(p){return Number(p.units||0)<=3&&Number(p.grossProfit||0)<5000}).sort(function(a,b){return a.grossProfit-b.grossProfit}).slice(0,4);
+
+    summary.innerHTML=
+      '<div><span>利益の柱</span><strong>'+esc(topProfitCat.name)+'</strong><small>粗利 '+yen(topProfitCat.profit)+' / 粗利率 '+topProfitCat.margin.toFixed(1)+'%</small></div>'+
+      '<div><span>高粗利カテゴリー</span><strong>'+esc(highMarginCat.name)+'</strong><small>粗利率 '+highMarginCat.margin.toFixed(1)+'%</small></div>'+
+      '<div><span>優先強化商品</span><strong>'+(heroes[0]?esc(heroes[0].name):'-')+'</strong><small>'+(heroes[0]?'粗利 '+yen(heroes[0].grossProfit)+' / '+heroes[0].units+'点':'データ不足')+'</small></div>';
+
+    function items(arr){
+      return arr.length?'<ul>'+arr.map(function(p){return '<li><b>'+esc(p.name)+'</b><span>売上 '+yen(p.sales)+' / 粗利 '+yen(p.grossProfit)+' / '+p.units+'点</span></li>'}).join('')+'</ul>':'<p class="note">該当商品なし</p>';
+    }
+    cards.innerHTML=
+      '<article class="strategy-card priority"><div class="strategy-icon">↑</div><div><h4>最優先で強化</h4><p>粗利と販売数の両方が強い商品。欠品を避け、メニュー上部・店内POP・SNSで露出を増やす。</p>'+items(heroes)+'</div></article>'+
+      '<article class="strategy-card traffic"><div class="strategy-icon">＋</div><div><h4>集客商品として活用</h4><p>販売数は多いが粗利が低い商品。値下げではなく、高粗利ドリンク・軽食・喫煙具のセット提案につなげる。</p>'+items(traffic)+'</div></article>'+
+      '<article class="strategy-card premium"><div class="strategy-icon">◆</div><div><h4>高単価商品の接客強化</h4><p>粗利は大きいが販売数がまだ少ない商品。スタッフ提案、実物展示、Instagramで魅力を説明して成約率を上げる。</p>'+items(premium)+'</div></article>'+
+      '<article class="strategy-card review"><div class="strategy-icon">−</div><div><h4>仕入れを見直す</h4><p>期間中の販売数・粗利が小さい商品。棚を圧迫するなら追加仕入れを止め、売り切って入替候補にする。</p>'+items(weak)+'</div></article>';
+  }
+
   function verdict(p){if(p.grossProfit>=100000&&p.margin>=35)return ['強化候補','focus'];if(p.grossProfit<=0||(p.units<=2&&p.sales<10000))return ['見直し','review'];return ['維持','keep']}
-  function renderAnalytics(){var top=sales.slice().sort(function(a,b){return b.grossProfit-a.grossProfit}).slice(0,10);$('#profitTable').innerHTML=top.map(function(p,i){return '<div class="rank-row"><span class="rank-num">'+(i+1)+'</span><div><b>'+esc(p.name)+'</b><small>'+esc(p.category)+' / 粗利率 '+p.margin+'%</small></div><strong>'+yen(p.grossProfit)+'</strong></div>'}).join('');var c={};sales.forEach(function(p){var k=p.category||'未設定';if(!c[k])c[k]={sales:0,profit:0,units:0};c[k].sales+=p.sales;c[k].profit+=p.grossProfit;c[k].units+=p.units});var a=Object.keys(c).map(function(k){return {name:k,sales:c[k].sales,profit:c[k].profit,units:c[k].units}}).sort(function(x,y){return y.profit-x.profit}),max=Math.max.apply(null,a.map(function(x){return x.profit}).concat([1]));$('#categoryBars').innerHTML=a.slice(0,8).map(function(x){return '<div class="bar-row"><div class="bar-label"><span>'+esc(x.name)+'</span><b>'+yen(x.profit)+'</b></div><div class="bar-track"><div class="bar-fill" style="width:'+Math.max(2,x.profit/max*100)+'%"></div></div><div class="bar-sub">売上 '+yen(x.sales)+' / '+x.units.toLocaleString()+'点</div></div>'}).join('');renderProductTable()}
+  function renderAnalytics(){renderStrategy();var top=sales.slice().sort(function(a,b){return b.grossProfit-a.grossProfit}).slice(0,10);$('#profitTable').innerHTML=top.map(function(p,i){return '<div class="rank-row"><span class="rank-num">'+(i+1)+'</span><div><b>'+esc(p.name)+'</b><small>'+esc(p.category)+' / 粗利率 '+p.margin+'%</small></div><strong>'+yen(p.grossProfit)+'</strong></div>'}).join('');var c={};sales.forEach(function(p){var k=p.category||'未設定';if(!c[k])c[k]={sales:0,profit:0,units:0};c[k].sales+=p.sales;c[k].profit+=p.grossProfit;c[k].units+=p.units});var a=Object.keys(c).map(function(k){return {name:k,sales:c[k].sales,profit:c[k].profit,units:c[k].units}}).sort(function(x,y){return y.profit-x.profit}),max=Math.max.apply(null,a.map(function(x){return x.profit}).concat([1]));$('#categoryBars').innerHTML=a.slice(0,8).map(function(x){return '<div class="bar-row"><div class="bar-label"><span>'+esc(x.name)+'</span><b>'+yen(x.profit)+'</b></div><div class="bar-track"><div class="bar-fill" style="width:'+Math.max(2,x.profit/max*100)+'%"></div></div><div class="bar-sub">売上 '+yen(x.sales)+' / '+x.units.toLocaleString()+'点</div></div>'}).join('');renderProductTable()}
   function renderProductTable(){var q=($('#productSearch').value||'').toLowerCase(),l=sales.filter(function(p){return (p.name+' '+p.category).toLowerCase().indexOf(q)>=0}).sort(function(a,b){return b.grossProfit-a.grossProfit}).slice(0,150);$('#productTableBody').innerHTML=l.map(function(p){var v=verdict(p);return '<tr><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.category)+'</td><td>'+yen(p.sales)+'</td><td>'+Number(p.units||0).toLocaleString()+'</td><td>'+yen(p.grossProfit)+'</td><td>'+p.margin+'%</td><td><span class="tag '+v[1]+'">'+v[0]+'</span></td></tr>'}).join('')}
   $('#productSearch').oninput=renderProductTable;
   $('#csvInput').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var rows=parseCSV(r.result),h=rows[0].map(function(x){return x.trim()}),ix=function(n){return h.indexOf(n)},num=function(row,n){return Number(String(row[ix(n)]||'0').replace(/,/g,''))||0};var m=rows.slice(1).filter(function(row){return row[ix('商品名')]}).map(function(row){var s=num(row,'販売総売上'),g=num(row,'粗利総額'),u=num(row,'販売商品数');return {name:row[ix('商品名')],category:row[ix('カテゴリー')]||'未設定',sales:s,grossProfit:g,units:u,margin:s?Number((g/s*100).toFixed(1)):0}});if(m.length){sales=m;save('ippukuSales',sales);alert(m.length+'商品を読み込みました');renderAll()}}catch(err){alert('CSVを読み込めませんでした')}};r.readAsText(f,'Shift_JIS')};
