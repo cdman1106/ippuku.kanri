@@ -177,18 +177,37 @@
   function pushCart(item,optionText){
     var key=cartKey(item,optionText),f=cart.find(function(y){return y.key===key});
     if(f)f.qty++;
-    else cart.push({key:key,name:item.name,displayName:item.name+(optionText?'（'+optionText+'）':''),category:item.category,price:item.price,qty:1,option:optionText||''});
+    else cart.push({key:key,name:item.name,displayName:item.name+(optionText?' / '+optionText:''),category:item.category,price:item.price,qty:1,option:optionText||''});
     renderCart();
   }
   function addMenuItem(item,done){
     if(!item.choices||!item.choices.length){
       pushCart(item,item.fixedOption||''); if(done)done(); return;
     }
-    var group=item.choices[0];
-    showModal('<h3>'+esc(item.name)+'</h3><p class="note">お好みを選んでください。</p><div class="choice-grid">'+group.options.map(function(o){return '<button class="choice-btn" data-choice="'+esc(o)+'">'+esc(o)+'</button>'}).join('')+'</div><div class="modal-actions"><button class="ghost" data-close>戻る</button></div>',function(){
-      $$('[data-choice]').forEach(function(b){b.onclick=function(){pushCart(item,b.dataset.choice);closeModal();if(done)done()}});
-    });
+    var selected=[],step=0;
+    function chooseStep(){
+      var group=item.choices[step];
+      showModal(
+        '<div class="choice-step"><span class="eyebrow">STEP '+(step+1)+' / '+item.choices.length+'</span><h3>'+esc(item.name)+'</h3><p class="choice-label">'+esc(group.label)+'</p>'+
+        '<div class="choice-grid">'+group.options.map(function(o){return '<button class="choice-btn" data-choice="'+esc(o)+'">'+esc(o)+'</button>'}).join('')+'</div>'+
+        '<div class="choice-current">'+(selected.length?'選択中：'+selected.map(function(x){return esc(x.label)+' '+esc(x.value)}).join(' / '):'')+'</div>'+
+        '<div class="modal-actions"><button class="ghost" data-close>キャンセル</button></div>',
+        function(){
+          $$('[data-choice]').forEach(function(b){
+            b.onclick=function(){
+              selected.push({label:group.label,value:b.dataset.choice});
+              step++;
+              if(step<item.choices.length){chooseStep();return}
+              var text=selected.map(function(x){return x.label+': '+x.value}).join(' / ');
+              pushCart(item,text);closeModal();if(done)done();
+            };
+          });
+        }
+      );
+    }
+    chooseStep();
   }
+
   function renderCustomerMenu(){
     var all=window.MENU_DATA||[],cats=[];
     all.forEach(function(x){if(cats.indexOf(x.category)<0)cats.push(x.category)});
