@@ -96,3 +96,18 @@ body.customer-mode .choice-btn{min-height:60px;font-size:14px}
 .food-order-note{margin:0 0 10px;padding:10px 12px;border:1px solid #5b4326;border-radius:12px;background:#241b12;color:#e9cfaa;font-size:11px;line-height:1.5}
 .choice-btn small{display:block;margin-top:3px;font-size:10px;color:var(--accent2)}
 @media(max-width:560px){.menu-card.with-photo{min-height:218px}.menu-card.with-photo .menu-card-tap{min-height:218px;padding:9px}.menu-photo-wrap{margin-bottom:8px}.menu-card.with-photo h3{font-size:13px}}
+
+.danger-btn{border:1px solid #7b3f38;background:#5a2b26;color:#ffd6d0;border-radius:12px;padding:10px 14px;font-weight:800}
+.danger-btn:active{transform:scale(.98)}
+.full-danger{width:100%;margin-top:14px}
+.danger-link{border:0;background:transparent;color:#e58e82;padding:5px 2px;font-size:11px;text-decoration:underline}
+.order-card-actions{display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+.delete-warning{color:#ef9a8e;font-size:12px}
+.cart-edit-list{display:grid;gap:10px;margin:12px 0}
+.cart-edit-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"info qty total" "info remove remove";gap:7px 10px;align-items:center;padding:11px;border:1px solid #392f25;border-radius:12px;background:#17130f}
+.cart-edit-info{grid-area:info;min-width:0}.cart-edit-info b{display:block;font-size:12px;line-height:1.45}.cart-edit-info small{display:block;color:var(--muted);font-size:10px;margin-top:4px}
+.cart-qty{grid-area:qty;display:flex;align-items:center;gap:8px}.cart-qty strong{min-width:18px;text-align:center}
+.qty-btn{width:36px;height:36px;border-radius:50%;border:1px solid #5b472f;background:#2b221a;color:var(--text);font-size:19px}
+.cart-line-total{grid-area:total;font-size:12px;font-weight:800;text-align:right}
+.cart-remove{grid-area:remove;justify-self:end;border:0;background:transparent;color:#e58e82;font-size:11px;padding:4px}
+@media(max-width:560px){.order-card{grid-template-columns:58px 1fr auto}.order-card-actions{min-width:52px}.cart-edit-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"info total" "qty remove"}.cart-line-total{align-self:start}}
