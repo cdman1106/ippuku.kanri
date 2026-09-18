@@ -456,12 +456,17 @@
 
   function isNightChargeTime(){
     try{
-      var parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',hour:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
-      var h=Number(parts.find(function(p){return p.type==='hour'}).value||0);
-      return h>=21||h<6;
+      var parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+      var wd=(parts.find(function(p){return p.type==='weekday'})||{}).value||'';
+      var h=Number((parts.find(function(p){return p.type==='hour'})||{}).value||0);
+      var m=Number((parts.find(function(p){return p.type==='minute'})||{}).value||0);
+      var mins=h*60+m;
+      if(wd==='Fri')return mins>=1260;
+      if(wd==='Sat')return mins<60||mins>=1260;
+      if(wd==='Sun')return mins<60;
+      return false;
     }catch(e){
-      var h=new Date().getHours();
-      return h>=21||h<6;
+      return false;
     }
   }
   function cartAmounts(items){
@@ -488,7 +493,7 @@
       var amounts=cartAmounts(cart);
       $('#modal').innerHTML='<h3>注文内容</h3><div class="cart-edit-list">'+cart.map(function(i,idx){return '<div class="cart-edit-row"><div class="cart-edit-info"><b>'+esc(i.displayName||i.name)+'</b><small>'+yen(i.price)+' / 1点</small></div><div class="cart-qty"><button class="qty-btn" data-cart-dec="'+idx+'">−</button><strong>'+i.qty+'</strong><button class="qty-btn" data-cart-inc="'+idx+'">＋</button></div><div class="cart-line-total">'+yen(i.price*i.qty)+'</div><button class="cart-remove" data-cart-remove="'+idx+'">削除</button></div>'}).join('')+'</div>'+
         '<div class="checkout-totals"><div><span>商品小計</span><strong>'+yen(amounts.subtotal)+'</strong></div>'+
-        (amounts.nightFee?'<div class="night-fee-line"><span>深夜料金（21時以降 10%）</span><strong>＋'+yen(amounts.nightFee)+'</strong></div>':'<div class="night-fee-info">21:00以降のご注文は深夜料金10%が加算されます。</div>')+
+        (amounts.nightFee?'<div class="night-fee-line"><span>深夜料金（金・土 21時以降 10%）</span><strong>＋'+yen(amounts.nightFee)+'</strong></div>':'<div class="night-fee-info">金・土の21:00〜翌1:00は深夜料金10%が加算されます。</div>')+
         '<div class="detail-total"><span>合計</span><strong>'+yen(amounts.total)+'</strong></div></div>'+
         '<div class="form-row"><label>スタッフへのメモ</label><input id="orderNote" placeholder="例：氷少なめ"></div><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="primary-btn" id="submitOrder">注文する</button></div>';
       $$('[data-close]').forEach(function(b){b.onclick=closeModal});
@@ -529,7 +534,7 @@
           }else{
             var localItems=payload.items.slice();
             if(amounts.nightFee){
-              localItems.push({name:'深夜料金',displayName:'深夜料金（21時以降10%）',category:'Fee',price:amounts.nightFee,qty:1,option:''});
+              localItems.push({name:'深夜料金',displayName:'深夜料金（金・土 21時以降10%）',category:'Fee',price:amounts.nightFee,qty:1,option:''});
             }
             newOrder={
               id:String(Date.now()),
