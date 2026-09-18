@@ -363,3 +363,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .seat-access-control{align-items:stretch;flex-direction:column}
   .seat-access-control button{width:100%;min-height:50px}
 }
+
+.cling-promo{margin:0 0 14px;padding:16px;border:1px solid #8b6b3a;border-radius:18px;background:linear-gradient(145deg,#302112,#16110c);box-shadow:var(--shadow)}
+.cling-kicker{display:inline-block;padding:6px 9px;border-radius:999px;background:#f0c77d;color:#25180b;font-size:10px;font-weight:1000}
+.cling-promo h3{margin:10px 0 5px;font-size:21px}.cling-promo>p{margin:0;color:#cdbda9;font-size:11px;line-height:1.6}
+.cling-price-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.cling-price-grid>div{padding:11px;border:1px solid #4c3a27;border-radius:12px;background:#17120d}
+.cling-price-grid span,.cling-price-grid strong{display:block}.cling-price-grid span{font-size:9px;color:var(--muted)}.cling-price-grid strong{margin-top:4px;font-size:15px;color:var(--accent2)}
+.cling-order-btn{width:100%;min-height:48px;border:0;border-radius:13px;background:var(--accent);color:#21170a;font-size:13px;font-weight:1000}
+.cling-promo>small{display:block;margin-top:8px;color:var(--muted);font-size:9px;line-height:1.5}
+@media(max-width:420px){.cling-price-grid{grid-template-columns:1fr}.cling-promo{padding:14px}}
