@@ -36,6 +36,14 @@ window.MENU_DATA = [
   {name:"ペリエ",category:"Refresh",price:580,description:"レモン果汁添え"},
   {name:"モンスター",category:"Refresh",price:580},
 
+  {name:"ポパイサンド",category:"Food",price:550,image:"./assets/menu/hot_sand.webp",description:"ハム＆とろ〜りチーズ、きのこ、ほうれん草"},
+  {name:"あんバターサンド",category:"Food",price:500,image:"./assets/menu/hot_sand.webp",description:"自家製あんこ＋バター"},
+  {name:"チーズケーキ",category:"Dessert",price:330,image:"./assets/menu/cheesecake.webp"},
+  {name:"コーヒーゼリーパフェ",category:"Dessert",price:550,image:"./assets/menu/coffee_jelly_parfait.webp"},
+  {name:"コーヒーゼリー",category:"Dessert",price:330,image:"./assets/menu/coffee_jelly_parfait.webp",description:"コーヒーゼリーのみ"},
+  {name:"こんがりワッフル",category:"Dessert",price:440,image:"./assets/menu/waffle.webp",description:"ソースを選べます",choices:[{label:"ソース",options:["チョコ","キャラメル","ベリー"]}]},
+  {name:"濃厚バニラアイス",category:"Dessert",price:380,image:"./assets/menu/vanilla_ice.webp",description:"ダブル（2個盛り）は30円引き",choices:[{label:"盛り方",options:[{label:"シングル",priceDelta:0},{label:"ダブル（2個盛り・30円引き）",priceDelta:350}]}]},
+
   {name:"ナッツ",category:"Snack",price:220},
   {name:"チョコレート",category:"Snack",price:110}
 ];
