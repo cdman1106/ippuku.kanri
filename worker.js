@@ -15,6 +15,16 @@ function json(data, status = 200) {
   });
 }
 
+function isNightChargeTimeJst(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    hour: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value || 0);
+  return hour >= 21 || hour < 6;
+}
+
 function normalizeItem(item) {
   return {
     name: String(item?.name || "").slice(0, 120),
@@ -119,13 +129,28 @@ async function createOrder(request, env) {
   const seat = String(body.seat || "");
   if (!SEATS.has(seat)) return json({ ok: false, error: "INVALID_SEAT" }, 400);
 
-  const items = Array.isArray(body.items) ? body.items.map(normalizeItem).filter((x) => x.name) : [];
+  const items = Array.isArray(body.items)
+    ? body.items.map(normalizeItem).filter((x) => x.name && x.category !== "Fee")
+    : [];
   if (!items.length || items.length > 50) return json({ ok: false, error: "INVALID_ITEMS" }, 400);
 
   const id = crypto.randomUUID();
-  const now = new Date().toISOString();
+  const nowDate = new Date();
+  const now = nowDate.toISOString();
   const note = String(body.note || "").slice(0, 500);
-  const total = items.reduce((sum, x) => sum + x.price * x.qty, 0);
+  const subtotal = items.reduce((sum, x) => sum + x.price * x.qty, 0);
+  const nightFee = isNightChargeTimeJst(nowDate) ? Math.round(subtotal * 0.10) : 0;
+  if (nightFee > 0) {
+    items.push({
+      name: "深夜料金",
+      displayName: "深夜料金（21時以降10%）",
+      category: "Fee",
+      price: nightFee,
+      qty: 1,
+      option: ""
+    });
+  }
+  const total = subtotal + nightFee;
 
   const statements = [
     env.DB.prepare(
