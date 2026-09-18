@@ -331,6 +331,15 @@
   }
 
   function renderCart(){var q=cart.reduce(function(a,i){return a+i.qty},0),t=cart.reduce(function(a,i){return a+i.price*i.qty},0);$('#cartSummary').textContent=q+'点 / '+yen(t)}
+  function signalNewOrderSafely(order){
+    setTimeout(function(){
+      try{
+        var signal={id:order.id,seat:order.seat,items:order.items,total:order.total,ts:Date.now()};
+        localStorage.setItem('ippukuOrderSignal',JSON.stringify(signal));
+        if(orderChannel)try{orderChannel.postMessage(signal)}catch(e){}
+      }catch(e){console.error('order signal failed',e)}
+    },0);
+  }
   function openCartModal(){
     if(!cart.length){alert('商品を選んでください');return}
     function draw(){
@@ -341,15 +350,44 @@
       $$('[data-cart-inc]').forEach(function(b){b.onclick=function(){cart[Number(b.dataset.cartInc)].qty++;renderCart();draw()}});
       $$('[data-cart-remove]').forEach(function(b){b.onclick=function(){cart.splice(Number(b.dataset.cartRemove),1);renderCart();if(!cart.length){closeModal();return}draw()}});
       $('#submitOrder').onclick=function(){
-        var t=cart.reduce(function(a,i){return a+i.price*i.qty},0);
-        var note=$('#orderNote').value;
-        var newOrder={id:String(Date.now()),seat:customerSeat,status:'ordered',items:cart.slice(),total:t,createdAt:new Date().toISOString(),note:note};
-        orders.push(newOrder);
-        save('ippukuOrders',orders);
-        var signal={id:newOrder.id,seat:newOrder.seat,items:newOrder.items,total:newOrder.total,ts:Date.now()};
-        try{localStorage.setItem('ippukuOrderSignal',JSON.stringify(signal))}catch(e){}
-        if(orderChannel)try{orderChannel.postMessage(signal)}catch(e){}
-        cart=[];closeModal();alert('注文を受け付けました。\n\nお会計の際は1階へ行き、席番号「'+customerSeat+'」を1階スタッフにお伝えください。');renderCart();renderAll();
+        if(!customerSeat){
+          alert('席番号を選択してください。');
+          return;
+        }
+        if(!cart.length){
+          alert('商品を選んでください。');
+          closeModal();
+          return;
+        }
+        var btn=$('#submitOrder');
+        if(btn){btn.disabled=true;btn.textContent='送信中…'}
+        try{
+          var t=cart.reduce(function(a,i){return a+Number(i.price||0)*Number(i.qty||0)},0);
+          var noteEl=$('#orderNote');
+          var newOrder={
+            id:String(Date.now()),
+            seat:customerSeat,
+            status:'ordered',
+            items:cart.map(function(i){return Object.assign({},i)}),
+            total:t,
+            createdAt:new Date().toISOString(),
+            note:noteEl?noteEl.value:''
+          };
+          orders.push(newOrder);
+          save('ippukuOrders',orders);
+          signalNewOrderSafely(newOrder);
+          cart=[];
+          renderCart();
+          closeModal();
+          renderAll();
+          showModal(
+            '<div class="order-success"><div class="order-success-mark">✓</div><h3>注文を受け付けました</h3><p>席番号 <strong>'+esc(customerSeat)+'</strong></p><p class="note">お会計の際は1階へ行き、席番号を1階スタッフにお伝えください。</p><div class="modal-actions"><button class="primary-btn" data-close>閉じる</button></div></div>'
+          );
+        }catch(e){
+          console.error('order submit failed',e);
+          if(btn){btn.disabled=false;btn.textContent='注文する'}
+          alert('注文処理でエラーが発生しました。もう一度お試しください。');
+        }
       };
     }
     showModal('<div></div>',draw);
