@@ -16,6 +16,76 @@
   var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', customerSeat=new URLSearchParams(location.search).get('seat')||localStorage.getItem('ippukuCustomerSeat')||'';
   if(!inventory.length) inventory=[{name:'コーヒー豆',stock:4,min:2,unit:'袋'},{name:'ホットサンド用パン',stock:18,min:10,unit:'枚'},{name:'紙コップ',stock:52,min:30,unit:'個'}];
 
+  var audioCtx=null, alarmTimer=null, alarmActive=false, soundEnabled=false;
+  var orderChannel=null;
+  try{if('BroadcastChannel' in window)orderChannel=new BroadcastChannel('ippuku-orders')}catch(e){}
+
+  function updateSoundButton(){
+    var b=$('#enableOrderSound'); if(!b)return;
+    b.textContent=soundEnabled?'🔔 通知音ON中':'🔕 通知音ON';
+    b.classList.toggle('sound-on',soundEnabled);
+  }
+  function ensureAudio(){
+    var Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx)return false;
+    if(!audioCtx)audioCtx=new Ctx();
+    if(audioCtx.state==='suspended')audioCtx.resume();
+    return true;
+  }
+  function alarmBeep(){
+    if(!soundEnabled||!audioCtx)return;
+    var now=audioCtx.currentTime;
+    [880,1320].forEach(function(freq,idx){
+      var osc=audioCtx.createOscillator(), gain=audioCtx.createGain();
+      osc.type='square'; osc.frequency.setValueAtTime(freq,now);
+      gain.gain.setValueAtTime(0.0001,now);
+      gain.gain.exponentialRampToValueAtTime(idx===0?0.72:0.5,now+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001,now+0.34);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(now); osc.stop(now+0.36);
+    });
+  }
+  function startOrderAlarm(order){
+    if(!order||document.body.classList.contains('customer-mode'))return;
+    var overlay=$('#orderAlarm');
+    if(!overlay)return;
+    $('#alarmSeat').textContent=order.seat||'--';
+    $('#alarmSummary').innerHTML=(order.items||[]).slice(0,5).map(function(i){return '<div><span>'+esc(i.displayName||i.name)+' ×'+i.qty+'</span><strong>'+yen(i.price*i.qty)+'</strong></div>'}).join('')+(order.total!=null?'<p>合計 '+yen(order.total)+'</p>':'');
+    overlay.classList.add('show'); overlay.setAttribute('aria-hidden','false');
+    alarmActive=true;
+    if(soundEnabled){
+      ensureAudio(); alarmBeep();
+      if(alarmTimer)clearInterval(alarmTimer);
+      alarmTimer=setInterval(function(){if(alarmActive)alarmBeep()},850);
+    }
+  }
+  function stopOrderAlarm(){
+    alarmActive=false;
+    if(alarmTimer){clearInterval(alarmTimer);alarmTimer=null}
+    var overlay=$('#orderAlarm'); if(overlay){overlay.classList.remove('show');overlay.setAttribute('aria-hidden','true')}
+  }
+  function enableOrderSound(){
+    if(!ensureAudio()){
+      alert('この端末では通知音を利用できません。');
+      return;
+    }
+    soundEnabled=true; updateSoundButton();
+    alarmBeep();
+  }
+  function findOrderBySignal(sig){
+    var latestOrders=load('ippukuOrders',[]);
+    return latestOrders.find(function(o){return String(o.id)===String(sig.id)})||{id:sig.id,seat:sig.seat,items:sig.items||[],total:sig.total||0};
+  }
+  function handleOrderSignal(raw){
+    try{
+      var sig=typeof raw==='string'?JSON.parse(raw):raw;
+      if(!sig||!sig.id)return;
+      orders=load('ippukuOrders',orders); renderAll();
+      startOrderAlarm(findOrderBySignal(sig));
+    }catch(e){}
+  }
+
+
   function page(name){
     $$('.page').forEach(function(p){p.classList.toggle('active',p.dataset.page===name)});
     $$('.nav-item').forEach(function(b){b.classList.toggle('active',b.dataset.go===name)});
@@ -25,7 +95,12 @@
     if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory') renderInventory(); if(name==='reserve') renderReserves(); if(name==='customer') renderCustomer();
     window.scrollTo(0,0);
   }
-  $$('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){if(location.hash!=='#order')location.hash='order';page('customer')}; $('#refreshBtn').onclick=renderAll;
+  $('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){if(location.hash!=='#order')location.hash='order';page('customer')}; $('#refreshBtn').onclick=renderAll;
+  $('#enableOrderSound').onclick=enableOrderSound;
+  $('#stopOrderAlarm').onclick=stopOrderAlarm;
+  updateSoundButton();
+  window.addEventListener('storage',function(e){if(e.key==='ippukuOrderSignal'&&e.newValue)handleOrderSignal(e.newValue)});
+  if(orderChannel)orderChannel.onmessage=function(e){handleOrderSignal(e.data)};
 
   function renderDashboard(){
     var s=sales.reduce(function(a,p){return a+Number(p.sales||0)},0), g=sales.reduce(function(a,p){return a+Number(p.grossProfit||0)},0), u=sales.reduce(function(a,p){return a+Number(p.units||0)},0);
@@ -66,7 +141,7 @@
     });
   }
 
-  function demo(seat){var m=(window.MENU_DATA||[]).slice(0,8);if(!m.length)return;var p=[m[Math.floor(Math.random()*m.length)],m[Math.floor(Math.random()*m.length)]],items=p.map(function(x){return {name:x.name,price:x.price,qty:1}});orders.push({id:String(Date.now()),seat:seat,status:'ordered',items:items,total:items.reduce(function(a,i){return a+i.price*i.qty},0),createdAt:new Date().toISOString(),note:''});save('ippukuOrders',orders);selectedSeat=seat;renderAll()}
+  function demo(seat){var m=(window.MENU_DATA||[]).slice(0,8);if(!m.length)return;var p=[m[Math.floor(Math.random()*m.length)],m[Math.floor(Math.random()*m.length)]],items=p.map(function(x){return {name:x.name,price:x.price,qty:1}}),o={id:String(Date.now()),seat:seat,status:'ordered',items:items,total:items.reduce(function(a,i){return a+i.price*i.qty},0),createdAt:new Date().toISOString(),note:''};orders.push(o);save('ippukuOrders',orders);selectedSeat=seat;renderAll();startOrderAlarm(o)}
 
 
   function renderStrategy(){
@@ -257,8 +332,13 @@
       $('#submitOrder').onclick=function(){
         var t=cart.reduce(function(a,i){return a+i.price*i.qty},0);
         var note=$('#orderNote').value;
-        orders.push({id:String(Date.now()),seat:customerSeat,status:'ordered',items:cart.slice(),total:t,createdAt:new Date().toISOString(),note:note});
-        save('ippukuOrders',orders);cart=[];closeModal();alert('注文を受け付けました。\n\nお会計の際は1階へ行き、席番号「'+customerSeat+'」を1階スタッフにお伝えください。');renderCart();renderAll();
+        var newOrder={id:String(Date.now()),seat:customerSeat,status:'ordered',items:cart.slice(),total:t,createdAt:new Date().toISOString(),note:note};
+        orders.push(newOrder);
+        save('ippukuOrders',orders);
+        var signal={id:newOrder.id,seat:newOrder.seat,items:newOrder.items,total:newOrder.total,ts:Date.now()};
+        localStorage.setItem('ippukuOrderSignal',JSON.stringify(signal));
+        if(orderChannel)try{orderChannel.postMessage(signal)}catch(e){}
+        cart=[];closeModal();alert('注文を受け付けました。\n\nお会計の際は1階へ行き、席番号「'+customerSeat+'」を1階スタッフにお伝えください。');renderCart();renderAll();
       };
     }
     showModal('<div></div>',draw);
