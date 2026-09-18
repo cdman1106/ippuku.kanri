@@ -196,7 +196,12 @@ async function createOrder(request, env) {
   const now = nowDate.toISOString();
   const note = String(body.note || "").slice(0, 500);
   const subtotal = items.reduce((sum, x) => sum + x.price * x.qty, 0);
-  const nightFee = isNightChargeTimeJst(nowDate) ? Math.round(subtotal * 0.10) : 0;
+  const nightFeeBase = items.reduce((sum, x) => {
+    // ZIPPOガチャは深夜料金の対象外。
+    if (x.name === "ZIPPOガチャ") return sum;
+    return sum + x.price * x.qty;
+  }, 0);
+  const nightFee = isNightChargeTimeJst(nowDate) ? Math.round(nightFeeBase * 0.10) : 0;
   if (nightFee > 0) {
     items.push({
       name: "深夜料金",
