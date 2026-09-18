@@ -111,3 +111,7 @@ body.customer-mode .choice-btn{min-height:60px;font-size:14px}
 .cart-line-total{grid-area:total;font-size:12px;font-weight:800;text-align:right}
 .cart-remove{grid-area:remove;justify-self:end;border:0;background:transparent;color:#e58e82;font-size:11px;padding:4px}
 @media(max-width:560px){.order-card{grid-template-columns:58px 1fr auto}.order-card-actions{min-width:52px}.cart-edit-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"info total" "qty remove"}.cart-line-total{align-self:start}}
+
+.checkout-guide{display:flex;flex-direction:column;gap:4px;margin:0 0 10px;padding:11px 12px;border:1px solid #6a4a24;border-radius:12px;background:#2a1f13;color:#f7e5c3}
+.checkout-guide strong{font-size:12px;color:var(--accent2)}
+.checkout-guide span{font-size:11px;line-height:1.55}
