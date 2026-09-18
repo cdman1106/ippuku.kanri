@@ -18,11 +18,21 @@ function json(data, status = 200) {
 function isNightChargeTimeJst(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Tokyo",
+    weekday: "short",
     hour: "2-digit",
+    minute: "2-digit",
     hourCycle: "h23"
   }).formatToParts(date);
+  const weekday = parts.find((p) => p.type === "weekday")?.value || "";
   const hour = Number(parts.find((p) => p.type === "hour")?.value || 0);
-  return hour >= 21 || hour < 6;
+  const minute = Number(parts.find((p) => p.type === "minute")?.value || 0);
+  const mins = hour * 60 + minute;
+
+  // 金・土は13:00〜翌1:00営業。深夜料金は21:00〜翌1:00のみ。
+  if (weekday === "Fri") return mins >= 21 * 60;
+  if (weekday === "Sat") return mins < 60 || mins >= 21 * 60;
+  if (weekday === "Sun") return mins < 60;
+  return false;
 }
 
 function normalizeItem(item) {
@@ -143,7 +153,7 @@ async function createOrder(request, env) {
   if (nightFee > 0) {
     items.push({
       name: "深夜料金",
-      displayName: "深夜料金（21時以降10%）",
+      displayName: "深夜料金（金・土 21時以降10%）",
       category: "Fee",
       price: nightFee,
       qty: 1,
