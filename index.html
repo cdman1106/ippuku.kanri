@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#17130f">
 <title>いっぷく 店舗管理</title>
-<link rel="stylesheet" href="./styles.css?v=20260918-25">
+<link rel="stylesheet" href="./styles.css?v=20260918-26">
 </head>
 <body>
 <div id="app">
@@ -127,6 +127,7 @@
 
     <section class="page" data-page="inventory">
       <div class="section-head"><div><h2>在庫・発注</h2><p>紙の補充ライン・買出しラインを登録済み。現在庫を入力すると不足を判定します。</p></div><div class="inventory-head-actions"><button class="ghost" id="inventoryLineBtn">LINE用まとめ</button><button class="primary-btn" id="addInventoryBtn">＋ 商品追加</button></div></div>
+      <div id="inventoryShopFilters" class="inventory-shop-filters"></div>
       <div id="inventoryList" class="inventory-list"></div>
     </section>
 
@@ -188,6 +189,6 @@
 
 <script src="./sales-data.js"></script>
 <script src="./menu-data.js?v=20260918-8"></script>
-<script src="./app.js?v=20260918-31"></script>
+<script src="./app.js?v=20260918-32"></script>
 </body>
 </html>
