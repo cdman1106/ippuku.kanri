@@ -340,3 +340,12 @@ body.alarm-ringing{overflow:hidden;touch-action:none}
   .seat-order-history .status-btn{min-height:42px}
   .seat-running-total{position:sticky;top:8px;z-index:5;box-shadow:0 8px 20px rgba(0,0,0,.28)}
 }
+
+.night-charge-note{display:flex;flex-direction:column;gap:4px;margin:0 0 10px;padding:11px 12px;border:1px solid #55477a;border-radius:12px;background:#1d1830;color:#ece6ff}
+.night-charge-note strong{font-size:12px;color:#d8c9ff}
+.night-charge-note span{font-size:11px;line-height:1.55}
+.checkout-totals{margin-top:12px;padding-top:10px;border-top:1px solid #3b3026}
+.checkout-totals>div:not(.detail-total){display:flex;justify-content:space-between;gap:12px;padding:7px 0;font-size:12px}
+.night-fee-line{color:#e8d6ff}
+.night-fee-line strong{color:#d8c9ff}
+.night-fee-info{display:block!important;padding:8px 10px!important;border-radius:10px;background:#1d1830;color:#bfb2dd;font-size:10px!important;line-height:1.5}
