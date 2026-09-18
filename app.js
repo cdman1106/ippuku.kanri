@@ -52,7 +52,9 @@
     $('#alarmSeat').textContent=order.seat||'--';
     $('#alarmSummary').innerHTML=(order.items||[]).slice(0,5).map(function(i){return '<div><span>'+esc(i.displayName||i.name)+' ×'+i.qty+'</span><strong>'+yen(i.price*i.qty)+'</strong></div>'}).join('')+(order.total!=null?'<p>合計 '+yen(order.total)+'</p>':'');
     overlay.classList.add('show'); overlay.setAttribute('aria-hidden','false');
+    document.body.classList.add('alarm-ringing');
     alarmActive=true;
+    try{if(navigator.vibrate)navigator.vibrate([450,180,450,180,700])}catch(e){}
     if(soundEnabled){
       ensureAudio(); alarmBeep();
       if(alarmTimer)clearInterval(alarmTimer);
@@ -63,6 +65,8 @@
     alarmActive=false;
     if(alarmTimer){clearInterval(alarmTimer);alarmTimer=null}
     var overlay=$('#orderAlarm'); if(overlay){overlay.classList.remove('show');overlay.setAttribute('aria-hidden','true')}
+    document.body.classList.remove('alarm-ringing');
+    try{if(navigator.vibrate)navigator.vibrate(0)}catch(e){}
   }
   function enableOrderSound(){
     if(!ensureAudio()){
