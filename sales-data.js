@@ -1,0 +1,1 @@
+window.SALES_DATA=[];
