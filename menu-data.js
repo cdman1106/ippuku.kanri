@@ -45,5 +45,8 @@ window.MENU_DATA = [
   {name:"濃厚バニラアイス",category:"Dessert",price:380,image:"./assets/menu/vanilla_ice.webp",description:"ダブル（2個盛り）は30円引き",choices:[{label:"盛り方",options:[{label:"シングル",priceDelta:0},{label:"ダブル（2個盛り・30円引き）",priceDelta:350}]}]},
 
   {name:"ナッツ",category:"Snack",price:220},
-  {name:"チョコレート",category:"Snack",price:110}
+  {name:"チョコレート",category:"Snack",price:110},
+
+  {name:"ZIPPOガチャ",category:"Gacha",price:5000,description:"1回5,000円・深夜料金対象外",nightFeeExempt:true},
+  {name:"The Cling Lighter ガチャ",category:"Lighter",price:10000,description:"ランダムで1点。指名買いは店頭で15,000〜20,000円"}
 ];
