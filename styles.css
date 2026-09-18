@@ -403,3 +403,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .one-drink-note{display:flex;flex-direction:column;gap:4px;margin:0 0 10px;padding:12px 13px;border:1px solid #8a6537;border-radius:12px;background:#2b2116;color:#f4e4c6}
 .one-drink-note strong{font-size:13px;color:#f0c77d}
 .one-drink-note span{font-size:11px;line-height:1.6}
+
+.seat[data-status="noorder"]{background:#51241f;border-color:#c66557;color:#ffd8d2;animation:noOrderPulse 1.4s infinite alternate}
+.seat[data-status="noorder"] small{color:#ffb3a8;font-weight:900}
+@keyframes noOrderPulse{from{box-shadow:0 0 0 rgba(219,84,67,0)}to{box-shadow:0 0 0 5px rgba(219,84,67,.18)}}
+.no-order-alert-list{margin:0 0 14px;padding:14px;border:1px solid #9a4e44;border-radius:14px;background:#351916;color:#ffd7d1}
+.no-order-alert-title{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.no-order-alert-title strong{font-size:14px}.no-order-alert-title span{font-size:10px;color:#f2a69c}
+.no-order-alert-seats{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+.no-order-alert-seats button{border:1px solid #bb6256;border-radius:999px;background:#54251f;color:#ffe1dc;padding:8px 10px;font-weight:900}
+.no-order-alert-seats small{font-size:9px;color:#ffb8ad}
+.no-order-alert-list p{margin:5px 0 0;font-size:10px;line-height:1.55;color:#e9aaa1}
+@media(max-width:560px){.no-order-alert-title{align-items:flex-start;flex-direction:column;gap:3px}.no-order-alert-seats button{min-height:40px}}
