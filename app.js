@@ -224,7 +224,7 @@
       checkout.disabled=!customerSeatOpen;
       checkout.textContent=customerSeatOpen?'注文内容を確認':'この席は注文受付終了';
     }
-    $('.menu-card-tap,.promo-add').forEach(function(b){b.disabled=!customerSeatOpen});
+    $('.menu-card-tap,.promo-add,.cling-order-btn').forEach(function(b){b.disabled=!customerSeatOpen});
     if(showMessage&&wasOpen&&!customerSeatOpen){
       alert('この席の注文受付は終了しました。');
     }
@@ -442,11 +442,15 @@
   function renderCustomerPromos(){
     var box=$('#customerPromo'); if(!box)return;
     var ps=activePromos();
-    if(!ps.length){box.innerHTML='';box.style.display='none';return}
+    var cling=promoProduct('The Cling Lighter ガチャ');
     box.style.display='block';
-    box.innerHTML='<div class="promo-title-row"><div><span class="eyebrow">RECOMMENDED</span><h3>今、いっぷくでおすすめ</h3></div><small>気になったらそのまま追加できます</small></div>'+
-      '<div class="promo-scroll">'+ps.map(function(p,i){var m=promoProduct(p.product);return '<article class="promo-card"><span class="promo-tag">'+esc(p.tag||'おすすめ')+'</span><div class="promo-copy"><h3>'+esc(p.headline||p.product)+'</h3><p>'+esc(p.copy||'ぜひ一度お試しください。')+'</p></div><div class="promo-product"><div><b>'+esc(p.product)+'</b><strong>'+yen(m?m.price:0)+'</strong></div><button class="promo-add" data-promo-add="'+esc(p.product)+'">これを注文 ＋</button></div></article>'}).join('')+'</div>';
-    $$('[data-promo-add]').forEach(function(b){b.onclick=function(){var m=promoProduct(b.dataset.promoAdd);if(!m)return;addMenuItem(m,function(){b.textContent='追加しました ✓';setTimeout(function(){b.textContent='これを注文 ＋'},900)})}})
+    box.innerHTML=
+      '<article class="cling-promo"><div class="cling-kicker">当店おすすめ！</div><h3>The Cling Lighter</h3><p>重厚感のある人気ライター。買い方を選べます。</p><div class="cling-price-grid"><div><span>ガチャ・ランダム</span><strong>¥10,000</strong></div><div><span>指名買い</span><strong>¥15,000〜¥20,000</strong></div></div><button class="cling-order-btn" id="clingGachaAdd">ガチャで注文 ¥10,000</button><small>※ 指名買いはスタッフへお声がけください。</small></article>'+
+      (ps.length?'<div class="promo-title-row"><div><span class="eyebrow">RECOMMENDED</span><h3>今、いっぷくでおすすめ</h3></div><small>気になったらそのまま追加できます</small></div><div class="promo-scroll">'+ps.map(function(p,i){var m=promoProduct(p.product);return '<article class="promo-card"><span class="promo-tag">'+esc(p.tag||'おすすめ')+'</span><div class="promo-copy"><h3>'+esc(p.headline||p.product)+'</h3><p>'+esc(p.copy||'ぜひ一度お試しください。')+'</p></div><div class="promo-product"><div><b>'+esc(p.product)+'</b><strong>'+yen(m?m.price:0)+'</strong></div><button class="promo-add" data-promo-add="'+esc(p.product)+'">これを注文 ＋</button></div></article>'}).join('')+'</div>':'');
+    var clingBtn=$('#clingGachaAdd');
+    if(clingBtn&&cling)clingBtn.onclick=function(){addMenuItem(cling,function(){clingBtn.textContent='追加しました ✓';setTimeout(function(){clingBtn.textContent='ガチャで注文 ¥10,000'},900)})};
+    $('[data-promo-add]').forEach(function(b){b.onclick=function(){var m=promoProduct(b.dataset.promoAdd);if(!m)return;addMenuItem(m,function(){b.textContent='追加しました ✓';setTimeout(function(){b.textContent='これを注文 ＋'},900)})}});
+    refreshCustomerSeatAccess(false);
   }
   function renderPromoManager(){
     var menu=window.MENU_DATA||[];
@@ -482,7 +486,7 @@
     var key=cartKey(item,optionText),f=cart.find(function(y){return y.key===key});
     var finalPrice=Number(item.price||0)+Number(priceDelta||0);
     if(f)f.qty++;
-    else cart.push({key:key,name:item.name,displayName:item.name+(optionText?' / '+optionText:''),category:item.category,price:finalPrice,basePrice:item.price,qty:1,option:optionText||''});
+    else cart.push({key:key,name:item.name,displayName:item.name+(optionText?' / '+optionText:''),category:item.category,price:finalPrice,basePrice:item.price,qty:1,option:optionText||'',nightFeeExempt:item.nightFeeExempt===true});
     renderCart();
   }
   function addMenuItem(item,done){
@@ -518,7 +522,7 @@
   function renderCustomerMenu(){
     var all=window.MENU_DATA||[],cats=[];
     all.forEach(function(x){if(cats.indexOf(x.category)<0)cats.push(x.category)});
-    var labels={all:'すべて','Café':'Café','Relax':'Relax','Refresh':'Refresh','Food':'軽食','Dessert':'スイーツ','Snack':'Snack'};
+    var labels={all:'すべて','Café':'Café','Relax':'Relax','Refresh':'Refresh','Food':'軽食','Dessert':'スイーツ','Snack':'Snack','Gacha':'ガチャ','Lighter':'ライター'};
     var filters=[{key:'all',label:'すべて'}].concat(cats.map(function(c){return {key:c,label:labels[c]||c}}));
     $('#customerCategoryFilters').innerHTML=filters.map(function(f){return '<button class="customer-filter '+(customerCategory===f.key?'active':'')+'" data-customer-filter="'+esc(f.key)+'">'+esc(f.label)+'</button>'}).join('');
     $$('[data-customer-filter]').forEach(function(b){b.onclick=function(){customerCategory=b.dataset.customerFilter;renderCustomerMenu()}});
@@ -547,8 +551,12 @@
   }
   function cartAmounts(items){
     var subtotal=items.reduce(function(a,i){return a+Number(i.price||0)*Number(i.qty||0)},0);
-    var nightFee=isNightChargeTime()?Math.round(subtotal*.10):0;
-    return {subtotal:subtotal,nightFee:nightFee,total:subtotal+nightFee};
+    var feeBase=items.reduce(function(a,i){
+      if(i.nightFeeExempt===true||i.name==='ZIPPOガチャ')return a;
+      return a+Number(i.price||0)*Number(i.qty||0);
+    },0);
+    var nightFee=isNightChargeTime()?Math.round(feeBase*.10):0;
+    return {subtotal:subtotal,nightFeeBase:feeBase,nightFee:nightFee,total:subtotal+nightFee};
   }
   function renderCart(){
     var q=cart.reduce(function(a,i){return a+i.qty},0),a=cartAmounts(cart);
@@ -573,7 +581,7 @@
       var amounts=cartAmounts(cart);
       $('#modal').innerHTML='<h3>注文内容</h3><div class="cart-edit-list">'+cart.map(function(i,idx){return '<div class="cart-edit-row"><div class="cart-edit-info"><b>'+esc(i.displayName||i.name)+'</b><small>'+yen(i.price)+' / 1点</small></div><div class="cart-qty"><button class="qty-btn" data-cart-dec="'+idx+'">−</button><strong>'+i.qty+'</strong><button class="qty-btn" data-cart-inc="'+idx+'">＋</button></div><div class="cart-line-total">'+yen(i.price*i.qty)+'</div><button class="cart-remove" data-cart-remove="'+idx+'">削除</button></div>'}).join('')+'</div>'+
         '<div class="checkout-totals"><div><span>商品小計</span><strong>'+yen(amounts.subtotal)+'</strong></div>'+
-        (amounts.nightFee?'<div class="night-fee-line"><span>深夜料金（金・土 21時以降 10%）</span><strong>＋'+yen(amounts.nightFee)+'</strong></div>':'<div class="night-fee-info">金・土の21:00〜翌1:00は深夜料金10%が加算されます。</div>')+
+        (amounts.nightFee?'<div class="night-fee-line"><span>深夜料金（金・土 21時以降 10%）</span><strong>＋'+yen(amounts.nightFee)+'</strong></div>':'<div class="night-fee-info">金・土の21:00〜翌1:00は深夜料金10%が加算されます。ZIPPOガチャは対象外です。</div>')+
         '<div class="detail-total"><span>合計</span><strong>'+yen(amounts.total)+'</strong></div></div>'+
         '<div class="form-row"><label>スタッフへのメモ</label><input id="orderNote" placeholder="例：氷少なめ"></div><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="primary-btn" id="submitOrder">注文する</button></div>';
       $$('[data-close]').forEach(function(b){b.onclick=closeModal});
