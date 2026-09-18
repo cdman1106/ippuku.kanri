@@ -115,3 +115,15 @@ body.customer-mode .choice-btn{min-height:60px;font-size:14px}
 .checkout-guide{display:flex;flex-direction:column;gap:4px;margin:0 0 10px;padding:11px 12px;border:1px solid #6a4a24;border-radius:12px;background:#2a1f13;color:#f7e5c3}
 .checkout-guide strong{font-size:12px;color:var(--accent2)}
 .checkout-guide span{font-size:11px;line-height:1.55}
+
+.sound-enable.sound-on{border-color:#4f8d63;background:#24452f;color:#a9e7bd}
+.order-alarm{position:fixed;inset:0;z-index:250;display:none;place-items:center;padding:20px;background:rgba(84,9,7,.94);backdrop-filter:blur(8px)}
+.order-alarm.show{display:grid;animation:alarmFlash .8s infinite alternate}
+.order-alarm-card{width:min(520px,100%);text-align:center;background:#160c0a;border:3px solid #ff6f5d;border-radius:24px;padding:28px 20px;box-shadow:0 0 0 8px rgba(255,111,93,.12)}
+.alarm-pulse{width:76px;height:76px;margin:0 auto 12px;border-radius:50%;display:grid;place-items:center;background:#ff6653;color:#240a07;font-size:54px;font-weight:1000;animation:alarmPulse .55s infinite alternate}
+.alarm-eyebrow{font-size:12px;font-weight:900;letter-spacing:.22em;color:#ff9d8f}.order-alarm h2{margin:8px 0 18px;font-size:25px}.alarm-seat{font-size:20px;color:#ffd2cc}.alarm-seat strong{display:block;font-size:56px;color:#fff;margin-top:3px}
+.alarm-summary{margin:16px 0;padding:12px;background:#24110e;border-radius:14px;text-align:left}.alarm-summary div{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #4b211c;font-size:12px}.alarm-summary p{margin:10px 0 0;text-align:right;font-weight:900;color:#ffd0c9}
+.alarm-stop{width:100%;min-height:68px;border:0;border-radius:16px;background:#fff;color:#4d0c08;font-size:20px;font-weight:1000}
+@keyframes alarmFlash{from{background:rgba(84,9,7,.92)}to{background:rgba(150,20,12,.97)}}@keyframes alarmPulse{from{transform:scale(.92)}to{transform:scale(1.06)}}
+body.customer-mode .order-alarm{display:none!important}
+@media(max-width:560px){.sound-enable{font-size:11px;padding:8px}.order-alarm-card{padding:22px 14px}.alarm-seat strong{font-size:48px}}
