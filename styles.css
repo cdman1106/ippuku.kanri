@@ -378,3 +378,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .cling-try-note>span{grid-area:tag;padding:6px 7px;border-radius:8px;background:#f0c77d;color:#26190b;font-size:9px;font-weight:1000}
 .cling-try-note>b{grid-area:title;font-size:11px}
 .cling-try-note>small{grid-area:sub;color:var(--muted);font-size:9px;line-height:1.4}
+
+.inventory-head-actions{display:flex;gap:8px;flex-wrap:wrap}
+.line-copy-text{width:100%;min-height:300px;margin:12px 0;padding:14px;border:1px solid #493b2e;border-radius:12px;background:#12100d;color:var(--text);font:14px/1.75 system-ui,-apple-system,sans-serif;resize:vertical}
+@media(max-width:560px){.inventory-head-actions{width:100%}.inventory-head-actions button{flex:1;min-height:46px}.line-copy-text{min-height:340px;font-size:14px}}
