@@ -258,7 +258,7 @@
         var t=cart.reduce(function(a,i){return a+i.price*i.qty},0);
         var note=$('#orderNote').value;
         orders.push({id:String(Date.now()),seat:customerSeat,status:'ordered',items:cart.slice(),total:t,createdAt:new Date().toISOString(),note:note});
-        save('ippukuOrders',orders);cart=[];closeModal();alert('注文を受け付けました');renderCart();renderAll();
+        save('ippukuOrders',orders);cart=[];closeModal();alert('注文を受け付けました。\n\nお会計の際は1階へ行き、席番号「'+customerSeat+'」を1階スタッフにお伝えください。');renderCart();renderAll();
       };
     }
     showModal('<div></div>',draw);
