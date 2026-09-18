@@ -140,12 +140,15 @@
         <article class="panel setting-card"><div><h3>Airレジ API</h3><p>API仕様書が届いたらここを接続します。</p></div><span class="status waiting">仕様待ち</span></article>
         <article class="panel setting-card"><div><h3>過去売上データ</h3><p>Airレジ商品別売上CSVを一度読み込むと、この端末に保存されます。</p></div><span class="status waiting">CSV対応</span></article>
         <article class="panel setting-card"><div><h3>座席QR</h3><p>14席分のQRリンクを発行できます。</p></div><button class="ghost" id="showQrLinks">リンク表示</button></article>
+        <article class="panel setting-card"><div><h3>販促POP</h3><p>伸ばしたい商品をモバイルオーダー上部で自動宣伝します。</p></div><button class="ghost" id="managePromos">POP管理</button></article>
       </div>
       <div class="panel" id="qrLinksPanel" style="display:none"><div class="panel-head"><h3>座席別注文URL</h3></div><div id="qrLinks" class="qr-links"></div></div>
     </section>
 
     <section class="page customer-page" data-page="customer">
       <div class="customer-head"><div><span class="eyebrow">喫煙カフェ いっぷく</span><h2>モバイルオーダー</h2></div><div class="seat-pill">席 <strong id="customerSeat">未選択</strong></div></div>
+      <section id="customerPromo" class="customer-promo"></section>
+      <div class="customer-menu-head"><div><span class="eyebrow">MENU</span><h3>商品を選ぶ</h3></div><small>＋ を押すとカートに入ります</small></div>
       <div id="customerMenu" class="menu-grid"></div>
       <div class="cart-bar" id="cartBar"><div><small>カート</small><strong id="cartSummary">0点 / ¥0</strong></div><button class="primary-btn" id="checkoutBtn">注文内容を確認</button></div>
     </section>
