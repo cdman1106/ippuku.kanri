@@ -668,3 +668,8 @@ body.customer-mode .checkout-totals + .form-row{margin-top:18px}
   background:#ead8b8;
   color:#201a16;
 }
+
+
+/* Inventory smooth scrolling */
+.inventory-card{box-shadow:none!important}
+.inventory-shop-group{contain:layout style}
