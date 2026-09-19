@@ -1217,19 +1217,53 @@
             throw new Error('SEAT_CLOSED');
           }
           if(!result.ok||!result.data||!result.data.order)throw new Error('SERVER_ORDER_FAILED');
+
+          // ここまで来た時点でサーバー側では注文確定済み。
+          // 以降の画面描画エラーで「注文失敗」と誤表示しない。
           newOrder=result.data.order;
           if(cartHasDrink(payload.items))customerDrinkSatisfied=true;
-          orders=[newOrder].concat(orders.filter(function(x){return String(x.id)!==String(newOrder.id)}));
-          save('ippukuOrders',orders);
+          try{
+            orders=[newOrder].concat(orders.filter(function(x){return String(x.id)!==String(newOrder.id)}));
+            save('ippukuOrders',orders);
+          }catch(uiErr){
+            console.error('local order cache update failed',uiErr);
+          }
+
           cart=[];
-          renderCart();
-          closeModal();
-          renderAll();
-          showModal(
-            '<div class="order-success"><div class="order-success-mark">✓</div><h3>注文を受け付けました</h3><p>席番号 <strong>'+esc(customerSeat)+'</strong></p><p class="note">お会計の際は1階へ行き、席番号を1階スタッフにお伝えください。</p><div class="modal-actions"><button class="primary-btn" data-close>閉じる</button></div></div>'
-          );
+          try{renderCart()}catch(uiErr){console.error('cart render after order failed',uiErr)}
+          try{closeModal()}catch(uiErr){console.error('close modal after order failed',uiErr)}
+
+          // お客様画面ではスタッフ用renderAll()を呼ばない。
+          // 注文自体はHTTP 201で確定しているため、成功画面を最優先で表示。
+          try{
+            showModal(
+              '<div class="order-success"><div class="order-success-mark">✓</div><h3>注文を受け付けました</h3><p>席番号 <strong>'+esc(customerSeat)+'</strong></p><p class="note">お会計の際は1階へ行き、席番号を1階スタッフにお伝えください。</p><div class="modal-actions"><button class="primary-btn" data-close>閉じる</button></div></div>'
+            );
+          }catch(uiErr){
+            console.error('success modal render failed',uiErr);
+            alert('注文を受け付けました。席番号 '+customerSeat);
+          }
+
+          // 他タブ/スタッフ画面へのローカル通知は失敗しても注文結果に影響させない。
+          try{signalNewOrderSafely(newOrder)}catch(uiErr){console.error('order signal failed',uiErr)}
+          return;
         }catch(e){
           console.error('order submit failed',e);
+
+          // HTTP 201 + order が返っているなら注文は確定済み。
+          // 画面側の後処理だけで落ちても失敗表示にはしない。
+          if(typeof result!=='undefined'&&result&&result.status===201&&result.data&&result.data.order){
+            cart=[];
+            try{renderCart()}catch(uiErr){}
+            try{closeModal()}catch(uiErr){}
+            try{
+              showModal('<div class="order-success"><div class="order-success-mark">✓</div><h3>注文を受け付けました</h3><p>席番号 <strong>'+esc(customerSeat)+'</strong></p><p class="note">注文は正常に送信されています。</p><div class="modal-actions"><button class="primary-btn" data-close>閉じる</button></div></div>');
+            }catch(uiErr){
+              alert('注文を受け付けました。席番号 '+customerSeat);
+            }
+            return;
+          }
+
           if(btn){btn.disabled=false;btn.textContent='注文する'}
           if(e&&e.message==='SEAT_CLOSED'){
             closeModal();
