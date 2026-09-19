@@ -1162,7 +1162,7 @@
         (amounts.nightFee?'<div class="night-fee-line"><span>深夜料金 10%</span><strong>＋'+yen(amounts.nightFee)+'</strong></div>':'')+
         '<div class="detail-total"><span>合計</span><strong>'+yen(amounts.total)+'</strong></div></div>'+
         '<div class="form-row"><label>スタッフへのメモ</label><input id="orderNote" placeholder="例：氷少なめ"></div><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="primary-btn" id="submitOrder">注文する</button></div>';
-      $$$('[data-close]').forEach(function(b){b.onclick=closeModal});
+      $$('[data-close]').forEach(function(b){b.onclick=closeModal});
       $$('[data-cart-dec]').forEach(function(b){b.onclick=function(){var i=Number(b.dataset.cartDec);cart[i].qty--;if(cart[i].qty<=0)cart.splice(i,1);renderCart();if(!cart.length){closeModal();return}draw()}});
       $$('[data-cart-inc]').forEach(function(b){b.onclick=function(){cart[Number(b.dataset.cartInc)].qty++;renderCart();draw()}});
       $$('[data-cart-remove]').forEach(function(b){b.onclick=function(){cart.splice(Number(b.dataset.cartRemove),1);renderCart();if(!cart.length){closeModal();return}draw()}});
