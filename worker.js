@@ -52,7 +52,20 @@ function hasDrinkInItems(items) {
   return items.some((item) => DRINK_CATEGORIES.has(String(item?.category || "")));
 }
 
+async function ensureOrdersTables(env) {
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, seat TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ordered', total INTEGER NOT NULL DEFAULT 0, note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+  ).run();
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS order_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL, name TEXT NOT NULL, display_name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '', price INTEGER NOT NULL DEFAULT 0, qty INTEGER NOT NULL DEFAULT 1, option_text TEXT NOT NULL DEFAULT '', FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE)"
+  ).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)").run();
+}
+
 async function hasDrinkForSeatSession(env, seat, since) {
+  await ensureOrdersTables(env);
   let stmt;
   if (since) {
     stmt = env.DB.prepare(
@@ -196,6 +209,7 @@ async function setSeatAccess(request, env, seat) {
 }
 
 async function getOrder(env, id) {
+  await ensureOrdersTables(env);
   const row = await env.DB.prepare(
     "SELECT id, seat, status, total, note, created_at, updated_at FROM orders WHERE id = ?"
   ).bind(id).first();
@@ -225,6 +239,7 @@ async function getOrder(env, id) {
 }
 
 async function listOrders(request, env) {
+  await ensureOrdersTables(env);
   const url = new URL(request.url);
   const after = url.searchParams.get("after");
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit") || 100)));
@@ -282,6 +297,7 @@ async function listOrders(request, env) {
 }
 
 async function createOrder(request, env) {
+  await ensureOrdersTables(env);
   const body = await request.json().catch(() => null);
   if (!body) return json({ ok: false, error: "INVALID_JSON" }, 400);
 
@@ -349,6 +365,7 @@ async function createOrder(request, env) {
 }
 
 async function updateOrder(request, env, id) {
+  await ensureOrdersTables(env);
   const body = await request.json().catch(() => null);
   if (!body) return json({ ok: false, error: "INVALID_JSON" }, 400);
 
@@ -365,6 +382,7 @@ async function updateOrder(request, env, id) {
 }
 
 async function deleteOrder(env, id) {
+  await ensureOrdersTables(env);
   const existing = await env.DB.prepare("SELECT id FROM orders WHERE id = ?").bind(id).first();
   if (!existing) return json({ ok: false, error: "NOT_FOUND" }, 404);
 
@@ -380,7 +398,9 @@ async function handleApi(request, env) {
 
   const url = new URL(request.url);
   if (url.pathname === "/api/health" && request.method === "GET") {
-    return json({ ok: true, database: true });
+    await ensureOrdersTables(env);
+    await ensureSeatAccessTable(env);
+    return json({ ok: true, database: true, orders: true, seats: true });
   }
   const stateMatch = url.pathname.match(/^\/api\/state\/(sales|inventory|reserves|promos)$/);
   if (stateMatch && request.method === "GET") {
@@ -430,7 +450,11 @@ export default {
         return await handleApi(request, env);
       } catch (error) {
         console.error(error);
-        return json({ ok: false, error: "SERVER_ERROR" }, 500);
+        return json({
+          ok: false,
+          error: "SERVER_ERROR",
+          detail: String(error && error.message ? error.message : error).slice(0, 300)
+        }, 500);
       }
     }
     const assetResponse = await env.ASSETS.fetch(request);
