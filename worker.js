@@ -5,6 +5,7 @@ const SEATS = new Set([
 ]);
 const STATUSES = new Set(["ordered","preparing","served","paid"]);
 const DRINK_CATEGORIES = new Set(["Café","Relax","Refresh"]);
+const APP_STATE_KEYS = new Set(["sales","inventory","reserves","promos"]);
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -84,7 +85,7 @@ async function getAppState(env, key) {
 }
 
 async function setAppState(request, env, key) {
-  if (key !== "sales") return json({ ok: false, error: "INVALID_STATE_KEY" }, 400);
+  if (!APP_STATE_KEYS.has(key)) return json({ ok: false, error: "INVALID_STATE_KEY" }, 400);
   const body = await request.json().catch(() => null);
   if (!body || !Array.isArray(body.value)) return json({ ok: false, error: "INVALID_BODY" }, 400);
   if (body.value.length > 5000) return json({ ok: false, error: "STATE_TOO_LARGE" }, 413);
@@ -339,11 +340,12 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/health" && request.method === "GET") {
     return json({ ok: true, database: true });
   }
-  if (url.pathname === "/api/state/sales" && request.method === "GET") {
-    return getAppState(env, "sales");
+  const stateMatch = url.pathname.match(/^\/api\/state\/(sales|inventory|reserves|promos)$/);
+  if (stateMatch && request.method === "GET") {
+    return getAppState(env, stateMatch[1]);
   }
-  if (url.pathname === "/api/state/sales" && request.method === "PUT") {
-    return setAppState(request, env, "sales");
+  if (stateMatch && request.method === "PUT") {
+    return setAppState(request, env, stateMatch[1]);
   }
 
   if (url.pathname === "/api/seats" && request.method === "GET") {
