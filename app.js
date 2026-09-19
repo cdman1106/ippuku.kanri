@@ -454,8 +454,7 @@
   }
 
   function page(name){
-    if(name==='customer')document.documentElement.classList.remove('order-route-loading');
-    $('.page').forEach(function(p){p.classList.toggle('active',p.dataset.page===name)});
+    $$('.page').forEach(function(p){p.classList.toggle('active',p.dataset.page===name)});
     $$('.nav-item').forEach(function(b){b.classList.toggle('active',b.dataset.go===name)});
     $('#bottomNav').style.display=name==='customer'?'none':'flex'; $('.topbar').style.display=name==='customer'?'none':'flex'; document.body.classList.toggle('customer-mode',name==='customer');
     var t={dashboard:'店舗ダッシュボード',seats:'座席・注文管理',orders:'注文一覧',analytics:'売上分析',inventory:'在庫・発注',reserve:'取り置き管理',settings:'設定'};
@@ -463,7 +462,7 @@
     if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory'){renderInventory();if(backendReady)syncSharedStateKey('inventory')} if(name==='reserve'){renderReserves();if(backendReady)syncSharedStateKey('reserves')} if(name==='customer'){renderCustomer();if(backendReady)syncSharedStateKey('promos');startCustomerSeatWatch()}else{stopCustomerSeatWatch()}
     window.scrollTo(0,0);
   }
-  $('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){history.replaceState(null,'',location.pathname+'?order=1');customerSeat='';page('customer')}; $('#refreshBtn').onclick=renderAll;
+  $$('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){history.replaceState(null,'',location.pathname+'?order=1');customerSeat='';page('customer')}; $('#refreshBtn').onclick=renderAll;
   $('#enableOrderSound').onclick=enableOrderSound;
   $('#stopOrderAlarm').onclick=stopOrderAlarm;
   updateSoundButton();
@@ -1147,7 +1146,7 @@
         (amounts.nightFee?'<div class="night-fee-line"><span>深夜料金 10%</span><strong>＋'+yen(amounts.nightFee)+'</strong></div>':'')+
         '<div class="detail-total"><span>合計</span><strong>'+yen(amounts.total)+'</strong></div></div>'+
         '<div class="form-row"><label>スタッフへのメモ</label><input id="orderNote" placeholder="例：氷少なめ"></div><div class="modal-actions"><button class="ghost" data-close>戻る</button><button class="primary-btn" id="submitOrder">注文する</button></div>';
-      $$('[data-close]').forEach(function(b){b.onclick=closeModal});
+      $$$('[data-close]').forEach(function(b){b.onclick=closeModal});
       $$('[data-cart-dec]').forEach(function(b){b.onclick=function(){var i=Number(b.dataset.cartDec);cart[i].qty--;if(cart[i].qty<=0)cart.splice(i,1);renderCart();if(!cart.length){closeModal();return}draw()}});
       $$('[data-cart-inc]').forEach(function(b){b.onclick=function(){cart[Number(b.dataset.cartInc)].qty++;renderCart();draw()}});
       $$('[data-cart-remove]').forEach(function(b){b.onclick=function(){cart.splice(Number(b.dataset.cartRemove),1);renderCart();if(!cart.length){closeModal();return}draw()}});
@@ -1243,7 +1242,7 @@
       return '<div class="qr-link"><b>'+s+'</b><br><a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a></div>';
     }).join('');
   };
-  function showModal(html,after){$('#modal').innerHTML=html;$('#modalBackdrop').classList.add('show');$('[data-close]').forEach(function(b){b.onclick=closeModal});if(after)after()} function closeModal(){$('#modalBackdrop').classList.remove('show')} $('#modalBackdrop').onclick=function(e){if(e.target===$('#modalBackdrop'))closeModal()};
+  function showModal(html,after){$('#modal').innerHTML=html;$('#modalBackdrop').classList.add('show');$$('[data-close]').forEach(function(b){b.onclick=closeModal});if(after)after()} function closeModal(){$('#modalBackdrop').classList.remove('show')} $('#modalBackdrop').onclick=function(e){if(e.target===$('#modalBackdrop'))closeModal()};
   function renderAll(){renderDashboard();renderOrders();renderAnalytics();renderInventory();renderReserves();renderSeats()}
 
   function syncRoute(){
