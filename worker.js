@@ -66,6 +66,37 @@ async function hasDrinkForSeatSession(env, seat, since) {
   return !!row;
 }
 
+async function ensureAppStateTable(env) {
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS app_state (state_key TEXT PRIMARY KEY, value_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+  ).run();
+}
+
+async function getAppState(env, key) {
+  await ensureAppStateTable(env);
+  const row = await env.DB.prepare(
+    "SELECT value_json, updated_at FROM app_state WHERE state_key = ?"
+  ).bind(key).first();
+  if (!row) return json({ ok: true, exists: false, key, value: null, updatedAt: null });
+  let value = null;
+  try { value = JSON.parse(row.value_json); } catch {}
+  return json({ ok: true, exists: true, key, value, updatedAt: row.updated_at || null });
+}
+
+async function setAppState(request, env, key) {
+  if (key !== "sales") return json({ ok: false, error: "INVALID_STATE_KEY" }, 400);
+  const body = await request.json().catch(() => null);
+  if (!body || !Array.isArray(body.value)) return json({ ok: false, error: "INVALID_BODY" }, 400);
+  if (body.value.length > 5000) return json({ ok: false, error: "STATE_TOO_LARGE" }, 413);
+  const now = new Date().toISOString();
+  const valueJson = JSON.stringify(body.value);
+  await ensureAppStateTable(env);
+  await env.DB.prepare(
+    "INSERT INTO app_state (state_key, value_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(state_key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at"
+  ).bind(key, valueJson, now).run();
+  return json({ ok: true, key, updatedAt: now });
+}
+
 async function ensureSeatAccessTable(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS seat_access (seat TEXT PRIMARY KEY, is_open INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL)"
@@ -308,6 +339,13 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/health" && request.method === "GET") {
     return json({ ok: true, database: true });
   }
+  if (url.pathname === "/api/state/sales" && request.method === "GET") {
+    return getAppState(env, "sales");
+  }
+  if (url.pathname === "/api/state/sales" && request.method === "PUT") {
+    return setAppState(request, env, "sales");
+  }
+
   if (url.pathname === "/api/seats" && request.method === "GET") {
     return json({ ok: true, ...(await listSeatAccess(env)) });
   }
