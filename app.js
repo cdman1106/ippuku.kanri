@@ -1228,12 +1228,17 @@
   }
   $('#checkoutBtn').onclick=openCartModal;
   $('#managePromos').onclick=renderPromoManager;
+  // QRコード用URLは固定。今後の機能改善でもこの形式は変更しない。
+  // 既存QR: ?seat=C01#order
+  function customerOrderUrl(seat){
+    var base=location.origin+location.pathname.replace(/\/order\/?$/,'');
+    return base+'?seat='+encodeURIComponent(seat)+'#order';
+  }
   $('#showQrLinks').onclick=function(){
     var p=$('#qrLinksPanel');
     p.style.display=p.style.display==='none'?'block':'none';
-    var base=location.origin+location.pathname.replace(/\/order\/?$/,'');
     $('#qrLinks').innerHTML=SEATS.map(function(s){
-      var url=base+'?order=1&seat='+encodeURIComponent(s);
+      var url=customerOrderUrl(s);
       return '<div class="qr-link"><b>'+s+'</b><br><a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a></div>';
     }).join('');
   };
