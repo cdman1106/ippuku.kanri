@@ -15,7 +15,7 @@
   ]);
   var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', inventoryShopFilter='all', customerSeat=new URLSearchParams(location.search).get('seat')||load('ippukuCustomerSeat','')||'';
   var seatAccess={}, seatAccessMeta={}, customerSeatOpen=true, customerDrinkSatisfied=false, customerSeatTimer=null;
-  var INVENTORY_SEED_VERSION=4;
+  var INVENTORY_SEED_VERSION=5;
   var INVENTORY_SEED=[
     {name:'ガムシロップ',stock:'',min:6,unit:'個',source:'スタンバイ'},
     {name:'コーヒーフレッシュ',stock:'',min:20,unit:'個',source:'スタンバイ'},
@@ -92,16 +92,49 @@
 
   function inventoryKey(x){return String(x.name||'')+'|'+String(x.source||'')}
   var INVENTORY_SHOP_DEFAULTS={
+    '紅茶 Twining|買出し・棚1':'コスモス / 業スー',
+    'ココア|買出し・棚2':'コスモス',
+    '抹茶|買出し・棚2':'コスモス',
+    'ルイボス|買出し・棚2':'コスモス',
     '紅茶（日東）|買出し・棚2':'イオン',
+    'インスタントコーヒー|買出し・棚3':'コスモス',
+    'コーヒー豆|買出し・棚3':'業スー',
     'ゼラチン|買出し・棚3':'ネット',
     'ナッツ|買出し・棚3':'コストコ',
+    'マジックソルト|買出し・棚4':'コスモス',
+    'チョコソース|買出し・棚4':'業スー',
+    'キャラメルソース|買出し・棚4':'業スー',
+    '花見糖|買出し・棚4':'コスモス',
+    '上白糖|買出し・棚4':'コスモス',
+    'プラカップ|買出し・棚4':'ネット',
     'ストロー|買出し・棚5':'アスクル',
+
     'ペリエ|買出し・冷蔵庫':'ネット',
+    'コーラ|買出し・冷蔵庫':'コスモス',
     'りんご炭酸|買出し・冷蔵庫':'ネット',
     'モンスター|買出し・冷蔵庫':'ネット',
     '炭酸水|買出し・冷蔵庫':'コストコ',
+    'みかん|買出し・冷蔵庫':'コスモス',
+    '牛乳|買出し・冷蔵庫':'コスモス',
+
+    'カフェラテ原液|買出し・シンク下':'コスモス',
+    'キャラマキ原液|買出し・シンク下':'コスモス',
+
+    'パン（ホットサンド）|買出し・冷蔵庫チルド':'コスモス',
+    'チーズ|買出し・冷蔵庫チルド':'業スー',
+    'マヨネーズ|買出し・冷蔵庫チルド':'コスモス',
+    'バター風味|買出し・冷蔵庫チルド':'業スー',
+
     'アイスクリーム|買出し・冷凍庫':'イオン',
+    'ワッフル|買出し・冷凍庫':'業スー',
+    'チーズケーキ|買出し・冷凍庫':'業スー',
+    'ほうれん草|買出し・冷凍庫':'業スー',
     'きのこ|買出し・冷凍庫':'コストコ',
+    'ハム|買出し・冷凍庫':'業スー',
+
+    'ゆず蜜|買出し・野菜室':'業スー',
+    'ジャム（ブルーベリー）|買出し・野菜室':'業スー',
+    'あんこ|買出し・野菜室':'業スー',
     'ライター用オイル|買出し・その他':'Mr.Max'
   };
   INVENTORY_SEED.forEach(function(x){
@@ -556,7 +589,7 @@
   function parseCSV(t){var out=[],row=[],v='',q=false;for(var i=0;i<t.length;i++){var c=t[i],n=t[i+1];if(q){if(c==='"'&&n==='"'){v+='"';i++}else if(c==='"')q=false;else v+=c}else{if(c==='"')q=true;else if(c===','){row.push(v);v=''}else if(c==='\n'){row.push(v.replace(/\r$/,''));out.push(row);row=[];v=''}else v+=c}}if(v||row.length){row.push(v);out.push(row)}return out}
 
   function knownInventoryShops(){
-    var preferred=['イオン','ネット','コストコ','アスクル','Mr.Max','コスモス','業務スーパー'];
+    var preferred=['イオン','コスモス','業スー','ネット','コストコ','アスクル','Mr.Max','業務スーパー'];
     var used=[];
     inventory.forEach(function(x){
       var s=String(x.shop||'').trim();
@@ -608,7 +641,7 @@
 
     var order=Object.keys(groups).sort(function(a,b){
       if(a==='未設定')return 1;if(b==='未設定')return -1;
-      var pref=['イオン','ネット','コストコ','アスクル','Mr.Max','コスモス','業務スーパー'];
+      var pref=['イオン','コスモス','業スー','ネット','コストコ','アスクル','Mr.Max','業務スーパー'];
       var ai=pref.indexOf(a),bi=pref.indexOf(b);
       if(ai<0)ai=999;if(bi<0)bi=999;
       return ai===bi?a.localeCompare(b,'ja'):ai-bi;
@@ -667,7 +700,7 @@
   }
 
   function inventoryShopOptions(){
-    var shops=['イオン','ネット','コストコ','アスクル','Mr.Max','コスモス','業務スーパー'];
+    var shops=['イオン','コスモス','業スー','ネット','コストコ','アスクル','Mr.Max','業務スーパー'];
     knownInventoryShops().forEach(function(s){if(shops.indexOf(s)<0)shops.push(s)});
     return shops.map(function(s){return '<option value="'+esc(s)+'"></option>'}).join('');
   }
