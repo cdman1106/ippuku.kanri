@@ -104,12 +104,52 @@ async function ensureSeatAccessTable(env) {
   ).run();
 }
 
+function currentBusinessDayStartIso(date = new Date()) {
+  // 営業日はJSTの正午で切り替える。深夜1時までの営業は前営業日扱い。
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const y = jst.getUTCFullYear();
+  const m = jst.getUTCMonth();
+  const d = jst.getUTCDate();
+  const h = jst.getUTCHours();
+  const base = Date.UTC(y, m, h < 3 ? d - 1 : d, 3, 0, 0); // JST 12:00 = UTC 03:00
+  return new Date(base).toISOString();
+}
+
+async function resetLegacyClosedSeatsOnce(env) {
+  await ensureAppStateTable(env);
+  await ensureSeatAccessTable(env);
+  const key = "seat_access_reset_20260919_v1";
+  const row = await env.DB.prepare(
+    "SELECT state_key FROM app_state WHERE state_key = ?"
+  ).bind(key).first();
+  if (row) return;
+
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "UPDATE seat_access SET is_open = 1, updated_at = ? WHERE is_open = 0"
+  ).bind(now).run();
+  await env.DB.prepare(
+    "INSERT INTO app_state (state_key, value_json, updated_at) VALUES (?, ?, ?)"
+  ).bind(key, "true", now).run();
+}
+
+function effectiveSeatOpen(row) {
+  if (!row) return true;
+  const rawOpen = Number(row.is_open) === 1;
+  if (rawOpen) return true;
+  const updatedAt = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+  const businessStart = new Date(currentBusinessDayStartIso()).getTime();
+  // 前営業日の「受付終了」は翌営業日に持ち越さない。
+  return !updatedAt || updatedAt < businessStart;
+}
+
 async function getSeatAccess(env, seat) {
+  await resetLegacyClosedSeatsOnce(env);
   await ensureSeatAccessTable(env);
   const row = await env.DB.prepare(
     "SELECT is_open, updated_at FROM seat_access WHERE seat = ?"
   ).bind(seat).first();
-  const open = row ? Number(row.is_open) === 1 : true;
+  const open = effectiveSeatOpen(row);
   const updatedAt = row?.updated_at || null;
   return {
     seat,
@@ -120,6 +160,7 @@ async function getSeatAccess(env, seat) {
 }
 
 async function listSeatAccess(env) {
+  await resetLegacyClosedSeatsOnce(env);
   await ensureSeatAccessTable(env);
   const result = await env.DB.prepare(
     "SELECT seat, is_open, updated_at FROM seat_access"
@@ -132,7 +173,7 @@ async function listSeatAccess(env) {
     details[seat] = { open: true, updatedAt: null };
   }
   for (const row of rows) {
-    const open = Number(row.is_open) === 1;
+    const open = effectiveSeatOpen(row);
     seats[row.seat] = open;
     details[row.seat] = { open, updatedAt: row.updated_at || null };
   }
