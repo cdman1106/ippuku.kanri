@@ -704,3 +704,12 @@ body.customer-mode .checkout-totals + .form-row{margin-top:18px}
   .inventory-section-grid{grid-template-columns:1fr}
   .inventory-section{padding:10px}
 }
+
+
+/* Inventory keyboard entry */
+.stock-input:focus{
+  outline:2px solid #caa76d;
+  outline-offset:2px;
+  border-color:#caa76d!important;
+  background:#fffdf8;
+}
