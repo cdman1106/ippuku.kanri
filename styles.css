@@ -673,3 +673,34 @@ body.customer-mode .checkout-totals + .form-row{margin-top:18px}
 /* Inventory smooth scrolling */
 .inventory-card{box-shadow:none!important}
 .inventory-shop-group{contain:layout style}
+
+
+/* Inventory section layout */
+.inventory-section-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+  align-items:start;
+}
+.inventory-section{
+  min-width:0;
+  padding:12px;
+  border:1px solid #e6e0da;
+  border-radius:16px;
+  background:#fff;
+}
+.inventory-section-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:2px 2px 10px;
+}
+.inventory-section-head h3{margin:0;font-size:16px}
+.inventory-section-head span{font-size:10px;color:var(--muted)}
+.inventory-section .inventory-card{margin-top:8px}
+.inventory-section .inventory-card:first-of-type{margin-top:0}
+@media(max-width:760px){
+  .inventory-section-grid{grid-template-columns:1fr}
+  .inventory-section{padding:10px}
+}
