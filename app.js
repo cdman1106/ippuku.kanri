@@ -205,12 +205,16 @@
   async function apiRequest(path,options){
     try{
       var res=await fetch(path,Object.assign({cache:'no-store',headers:{'content-type':'application/json'}},options||{}));
+      var raw='';
+      try{raw=await res.text()}catch(e){}
       var data=null;
-      try{data=await res.json()}catch(e){}
-      if(!res.ok)return {ok:false,status:res.status,data:data};
-      return {ok:true,status:res.status,data:data};
+      if(raw){
+        try{data=JSON.parse(raw)}catch(e){}
+      }
+      if(!res.ok)return {ok:false,status:res.status,data:data,raw:raw};
+      return {ok:true,status:res.status,data:data,raw:raw};
     }catch(e){
-      return {ok:false,status:0,data:null};
+      return {ok:false,status:0,data:null,raw:'',networkError:String(e&&e.message?e.message:e)};
     }
   }
 
@@ -1235,9 +1239,11 @@
           }else if(e&&e.message==='BACKEND_OFFLINE'){
             alert('現在、注文サーバーに接続できません。注文は送信されていません。スタッフへお声がけください。');
           }else{
-            var serverError=(result&&result.data&&result.data.error)?String(result.data.error):'UNKNOWN';
+            var serverError=(result&&result.data&&result.data.error)?String(result.data.error):('HTTP_'+(result&&result.status!=null?result.status:'UNKNOWN'));
+            var detail=(result&&result.data&&result.data.detail)?String(result.data.detail):'';
+            if(!detail&&result&&result.raw)detail=String(result.raw).replace(/\s+/g,' ').slice(0,180);
             console.error('order server response',result);
-            alert('注文を送信できませんでした。注文は確定していません。\nエラー: '+serverError);
+            alert('注文を送信できませんでした。注文は確定していません。\nエラー: '+serverError+(detail?'\n詳細: '+detail:''));
           }
         }
       };
