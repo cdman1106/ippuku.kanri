@@ -52,6 +52,17 @@ function hasDrinkInItems(items) {
   return items.some((item) => DRINK_CATEGORIES.has(String(item?.category || "")));
 }
 
+async function tableColumns(env, table) {
+  const result = await env.DB.prepare("PRAGMA table_info(" + table + ")").all();
+  return new Set((result.results || []).map((row) => String(row.name)));
+}
+
+async function addColumnIfMissing(env, table, columns, name, sql) {
+  if (columns.has(name)) return;
+  await env.DB.prepare("ALTER TABLE " + table + " ADD COLUMN " + sql).run();
+  columns.add(name);
+}
+
 async function ensureOrdersTables(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, seat TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ordered', total INTEGER NOT NULL DEFAULT 0, note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
@@ -59,6 +70,22 @@ async function ensureOrdersTables(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS order_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL, name TEXT NOT NULL, display_name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '', price INTEGER NOT NULL DEFAULT 0, qty INTEGER NOT NULL DEFAULT 1, option_text TEXT NOT NULL DEFAULT '', FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE)"
   ).run();
+
+  // 古いD1テーブルが残っていても、必要な列を自動補修する。
+  const ordersCols = await tableColumns(env, "orders");
+  await addColumnIfMissing(env, "orders", ordersCols, "status", "status TEXT NOT NULL DEFAULT 'ordered'");
+  await addColumnIfMissing(env, "orders", ordersCols, "total", "total INTEGER NOT NULL DEFAULT 0");
+  await addColumnIfMissing(env, "orders", ordersCols, "note", "note TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing(env, "orders", ordersCols, "created_at", "created_at TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing(env, "orders", ordersCols, "updated_at", "updated_at TEXT NOT NULL DEFAULT ''");
+
+  const itemCols = await tableColumns(env, "order_items");
+  await addColumnIfMissing(env, "order_items", itemCols, "display_name", "display_name TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing(env, "order_items", itemCols, "category", "category TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing(env, "order_items", itemCols, "price", "price INTEGER NOT NULL DEFAULT 0");
+  await addColumnIfMissing(env, "order_items", itemCols, "qty", "qty INTEGER NOT NULL DEFAULT 1");
+  await addColumnIfMissing(env, "order_items", itemCols, "option_text", "option_text TEXT NOT NULL DEFAULT ''");
+
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)").run();
@@ -346,22 +373,29 @@ async function createOrder(request, env) {
   }
   const total = subtotal + nightFee;
 
-  const statements = [
-    env.DB.prepare(
+  try {
+    await env.DB.prepare(
       "INSERT INTO orders (id, seat, status, total, note, created_at, updated_at) VALUES (?, ?, 'ordered', ?, ?, ?, ?)"
-    ).bind(id, seat, total, note, now, now)
-  ];
+    ).bind(id, seat, total, note, now, now).run();
 
-  for (const item of items) {
-    statements.push(
+    const itemStatements = items.map((item) =>
       env.DB.prepare(
         "INSERT INTO order_items (order_id, name, display_name, category, price, qty, option_text) VALUES (?, ?, ?, ?, ?, ?, ?)"
-      ).bind(id, item.name, item.displayName, item.category, item.price, item.qty, item.option)
+      ).bind(id, item.name, item.displayName || item.name, item.category, item.price, item.qty, item.option)
     );
-  }
+    if (itemStatements.length) await env.DB.batch(itemStatements);
 
-  await env.DB.batch(statements);
-  return json({ ok: true, order: await getOrder(env, id) }, 201);
+    return json({ ok: true, order: await getOrder(env, id) }, 201);
+  } catch (error) {
+    // 注文ヘッダーだけ作成された場合は残さない。
+    try { await env.DB.prepare("DELETE FROM order_items WHERE order_id = ?").bind(id).run(); } catch {}
+    try { await env.DB.prepare("DELETE FROM orders WHERE id = ?").bind(id).run(); } catch {}
+    return json({
+      ok: false,
+      error: "ORDER_DB_ERROR",
+      detail: String(error && error.message ? error.message : error).slice(0, 300)
+    }, 500);
+  }
 }
 
 async function updateOrder(request, env, id) {
@@ -400,7 +434,14 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/health" && request.method === "GET") {
     await ensureOrdersTables(env);
     await ensureSeatAccessTable(env);
-    return json({ ok: true, database: true, orders: true, seats: true });
+    return json({
+      ok: true,
+      database: true,
+      orders: true,
+      seats: true,
+      orderColumns: Array.from(await tableColumns(env, "orders")),
+      itemColumns: Array.from(await tableColumns(env, "order_items"))
+    });
   }
   const stateMatch = url.pathname.match(/^\/api\/state\/(sales|inventory|reserves|promos)$/);
   if (stateMatch && request.method === "GET") {
