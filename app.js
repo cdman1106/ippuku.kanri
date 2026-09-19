@@ -1042,28 +1042,97 @@
     if(!item.choices||!item.choices.length){
       pushCart(item,item.fixedOption||'',0); if(done)done(); return;
     }
-    var selected=[],step=0,totalDelta=0;
+
+    var selected=[],step=0,totalDelta=0,multiSelected=[];
+
+    function finishChoice(){
+      var text=selected.map(function(x){return x.label+': '+x.value}).join(' / ');
+      pushCart(item,text,totalDelta);
+      closeModal();
+      if(done)done();
+    }
+
     function chooseStep(){
       var group=item.choices[step];
+      if(!group)return finishChoice();
+
+      var currentValues=group.multi?multiSelected.slice():[];
+      var currentText=selected.slice();
+      if(group.multi&&currentValues.length){
+        currentText.push({label:group.label,value:currentValues.join('＋')});
+      }
+
       showModal(
-        '<div class="choice-step"><span class="eyebrow">STEP '+(step+1)+' / '+item.choices.length+'</span><h3>'+esc(item.name)+'</h3><p class="choice-label">'+esc(group.label)+'</p>'+
-        '<div class="choice-grid">'+group.options.map(function(o){var label=typeof o==='string'?o:o.label;var delta=typeof o==='string'?0:Number(o.priceDelta||0);return '<button class="choice-btn" data-choice="'+esc(label)+'" data-delta="'+delta+'">'+esc(label)+(delta>0?'<small> +'+yen(delta)+'</small>':'')+'</button>'}).join('')+'</div>'+
-        '<div class="choice-current">'+(selected.length?'選択中：'+selected.map(function(x){return esc(x.label)+' '+esc(x.value)}).join(' / '):'')+'</div>'+
-        '<div class="modal-actions"><button class="ghost" data-close>キャンセル</button></div>',
+        '<div class="choice-step">'+
+          '<span class="eyebrow">STEP '+(step+1)+' / '+item.choices.length+'</span>'+
+          '<h3>'+esc(item.name)+'</h3>'+
+          '<p class="choice-label">'+esc(group.label)+(group.multi?' <small class="multi-choice-note">複数選択できます</small>':'')+'</p>'+
+          '<div class="choice-grid">'+group.options.map(function(o){
+            var label=typeof o==='string'?o:o.label;
+            var delta=typeof o==='string'?0:Number(o.priceDelta||0);
+            var active=group.multi&&currentValues.indexOf(label)>=0;
+            return '<button class="choice-btn '+(active?'selected':'')+'" data-choice="'+esc(label)+'" data-delta="'+delta+'">'+esc(label)+(delta>0?'<small> +'+yen(delta)+'</small>':'')+(active?'<span class="choice-check">✓</span>':'')+'</button>';
+          }).join('')+'</div>'+
+          '<div class="choice-current">'+(currentText.length?'選択中：'+currentText.map(function(x){return esc(x.label)+' '+esc(x.value)}).join(' / '):'選択してください')+'</div>'+
+          '<div class="modal-actions"><button class="ghost" data-close>キャンセル</button>'+
+            (group.multi?'<button class="primary-btn" id="confirmMultiChoice">この内容で決定</button>':'')+
+          '</div>'+
+        '</div>',
         function(){
           $$('[data-choice]').forEach(function(b){
             b.onclick=function(){
-              selected.push({label:group.label,value:b.dataset.choice});
-              totalDelta+=Number(b.dataset.delta||0);
+              var label=b.dataset.choice;
+              var delta=Number(b.dataset.delta||0);
+
+              if(group.multi){
+                if(label==='なし'){
+                  multiSelected=['なし'];
+                }else{
+                  multiSelected=multiSelected.filter(function(v){return v!=='なし'});
+                  var at=multiSelected.indexOf(label);
+                  if(at>=0)multiSelected.splice(at,1);
+                  else multiSelected.push(label);
+                }
+                chooseStep();
+                return;
+              }
+
+              selected.push({label:group.label,value:label});
+              totalDelta+=delta;
               step++;
+              multiSelected=[];
               if(step<item.choices.length){chooseStep();return}
-              var text=selected.map(function(x){return x.label+': '+x.value}).join(' / ');
-              pushCart(item,text,totalDelta);closeModal();if(done)done();
+              finishChoice();
             };
           });
+
+          var confirm=$('#confirmMultiChoice');
+          if(confirm){
+            confirm.onclick=function(){
+              if(!multiSelected.length){
+                alert('「なし」またはお好みを選択してください。');
+                return;
+              }
+
+              var multiDelta=0;
+              group.options.forEach(function(o){
+                var label=typeof o==='string'?o:o.label;
+                if(multiSelected.indexOf(label)<0)return;
+                multiDelta+=typeof o==='string'?0:Number(o.priceDelta||0);
+              });
+
+              selected.push({label:group.label,value:multiSelected.join('＋')});
+              totalDelta+=multiDelta;
+              step++;
+              multiSelected=[];
+              if(step<item.choices.length){chooseStep();return}
+              finishChoice();
+            };
+          }
         }
       );
     }
+
     chooseStep();
   }
 
