@@ -111,7 +111,7 @@ function currentBusinessDayStartIso(date = new Date()) {
   const m = jst.getUTCMonth();
   const d = jst.getUTCDate();
   const h = jst.getUTCHours();
-  const base = Date.UTC(y, m, h < 3 ? d - 1 : d, 3, 0, 0); // JST 12:00 = UTC 03:00
+  const base = Date.UTC(y, m, h < 12 ? d - 1 : d, 3, 0, 0); // JST 12:00 = UTC 03:00
   return new Date(base).toISOString();
 }
 
@@ -128,8 +128,9 @@ async function resetLegacyClosedSeatsOnce(env) {
   await env.DB.prepare(
     "UPDATE seat_access SET is_open = 1, updated_at = ? WHERE is_open = 0"
   ).bind(now).run();
+  // 同時リクエストでもUNIQUE制約エラーにしない。
   await env.DB.prepare(
-    "INSERT INTO app_state (state_key, value_json, updated_at) VALUES (?, ?, ?)"
+    "INSERT INTO app_state (state_key, value_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(state_key) DO NOTHING"
   ).bind(key, "true", now).run();
 }
 
