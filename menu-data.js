@@ -6,23 +6,22 @@ window.MENU_DATA = [
   ]},
   {name:"ミルクティー",category:"Relax",price:580,badges:["HOT","ICE"],choices:[
     {label:"温度",options:["HOT","ICE"]},
-    {label:"甘さ",options:["なし","砂糖","ガムシロップ"]}
+    {label:"お好み",options:["なし","砂糖（シロップ）","ミルク"]}
   ]},
   {name:"抹茶ラテ",category:"Relax",price:660,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
   {name:"ルイボスティー",category:"Relax",price:550,badges:["HOT","ICE"],choices:[
     {label:"温度",options:["HOT","ICE"]},
-    {label:"甘さ",options:["なし","砂糖","ガムシロップ"]}
+    {label:"お好み",options:["なし","砂糖（シロップ）","ミルク"]}
   ]},
   {name:"ゆず蜜",category:"Relax",price:650,badges:["HOT","ICE"],choices:[{label:"割り方",options:["水割り","お湯割り","炭酸割り"]}]},
 
   {name:"コーヒー",category:"Café",price:550,badges:["HOT","ICE"],choices:[
     {label:"温度",options:["HOT","ICE"]},
-    {label:"甘さ",options:["なし（ブラック）","砂糖","ガムシロップ"]},
-    {label:"コーヒーフレッシュ",options:["なし","あり"]}
+    {label:"お好み",options:["なし","砂糖（シロップ）","ミルク"]}
   ]},
   {name:"カフェラテ",category:"Café",price:580,badges:["HOT","ICE"],choices:[
     {label:"温度",options:["HOT","ICE"]},
-    {label:"甘さ",options:["なし","砂糖","ガムシロップ"]}
+    {label:"お好み",options:["なし","砂糖（シロップ）","ミルク"]}
   ]},
   {name:"ウィンナーコーヒー",category:"Café",price:650,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
   {name:"キャラメルマキアート",category:"Café",price:660,badges:["HOT","ICE"],choices:[{label:"温度",options:["HOT","ICE"]}]},
