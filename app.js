@@ -433,7 +433,16 @@
     var result=await apiRequest('/api/seats/'+encodeURIComponent(customerSeat));
     if(!result.ok)return true;
     var wasOpen=customerSeatOpen;
-    customerSeatOpen=result.data.open!==false;
+    var serverOpen=result.data.open!==false;
+    if(!serverOpen&&result.data.updatedAt){
+      var updated=new Date(result.data.updatedAt);
+      var now=new Date();
+      var jstNow=new Date(now.getTime()+9*60*60*1000);
+      var y=jstNow.getUTCFullYear(),m=jstNow.getUTCMonth(),d=jstNow.getUTCDate(),h=jstNow.getUTCHours();
+      var businessStart=new Date(Date.UTC(y,m,h<3?d-1:d,3,0,0));
+      if(updated.getTime()<businessStart.getTime())serverOpen=true;
+    }
+    customerSeatOpen=serverOpen;
     customerDrinkSatisfied=result.data.drinkOrdered===true;
     var note=$('#seatClosedNotice');
     if(note)note.style.display=customerSeatOpen?'none':'block';
