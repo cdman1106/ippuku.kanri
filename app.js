@@ -234,7 +234,7 @@
   }
 
 
-  var backendReady=false, backendChecked=false, serverOrdersInitialized=false, serverSeenIds=new Set(), serverSyncTimer=null, sharedStateTimer=null;
+  var backendReady=false, backendChecked=false, serverOrdersInitialized=false, serverSeenIds=new Set(), serverSyncTimer=null, sharedStateTimer=null, sharedPending=load('ippukuSharedPending',{});
 
   async function apiRequest(path,options){
     try{
@@ -255,6 +255,24 @@
       body:JSON.stringify({value:value})
     });
     return !!result.ok;
+  }
+
+  function markSharedPending(key){
+    sharedPending[key]=Date.now();
+    save('ippukuSharedPending',sharedPending);
+  }
+
+  function clearSharedPending(key){
+    if(!sharedPending[key])return;
+    delete sharedPending[key];
+    save('ippukuSharedPending',sharedPending);
+  }
+
+  async function saveSharedState(key,value){
+    markSharedPending(key);
+    var ok=await pushSharedState(key,value);
+    if(ok)clearSharedPending(key);
+    return ok;
   }
 
   function applySharedState(key,value){
@@ -290,6 +308,17 @@
 
   async function syncSharedStateKey(key){
     if(!backendReady)return;
+
+    // 端末側に未送信の編集がある時は、サーバーの古い値で上書きしない。
+    if(sharedPending[key]){
+      var pendingValue=localSharedState(key);
+      if(Array.isArray(pendingValue)){
+        var pushed=await pushSharedState(key,pendingValue);
+        if(pushed)clearSharedPending(key);
+      }
+      return;
+    }
+
     var result=await apiRequest('/api/state/'+encodeURIComponent(key));
     if(!result.ok||!result.data)return;
 
@@ -646,7 +675,7 @@
   function renderAnalytics(){renderStrategy();var top=sales.slice().sort(function(a,b){return b.grossProfit-a.grossProfit}).slice(0,10);$('#profitTable').innerHTML=top.map(function(p,i){return '<div class="rank-row"><span class="rank-num">'+(i+1)+'</span><div><b>'+esc(p.name)+'</b><small>'+esc(p.category)+' / 粗利率 '+p.margin+'%</small></div><strong>'+yen(p.grossProfit)+'</strong></div>'}).join('');var c={};sales.forEach(function(p){var k=p.category||'未設定';if(!c[k])c[k]={sales:0,profit:0,units:0};c[k].sales+=p.sales;c[k].profit+=p.grossProfit;c[k].units+=p.units});var a=Object.keys(c).map(function(k){return {name:k,sales:c[k].sales,profit:c[k].profit,units:c[k].units}}).sort(function(x,y){return y.profit-x.profit}),max=Math.max.apply(null,a.map(function(x){return x.profit}).concat([1]));$('#categoryBars').innerHTML=a.slice(0,8).map(function(x){return '<div class="bar-row"><div class="bar-label"><span>'+esc(x.name)+'</span><b>'+yen(x.profit)+'</b></div><div class="bar-track"><div class="bar-fill" style="width:'+Math.max(2,x.profit/max*100)+'%"></div></div><div class="bar-sub">売上 '+yen(x.sales)+' / '+x.units.toLocaleString()+'点</div></div>'}).join('');renderProductTable()}
   function renderProductTable(){var q=($('#productSearch').value||'').toLowerCase(),l=sales.filter(function(p){return (p.name+' '+p.category).toLowerCase().indexOf(q)>=0}).sort(function(a,b){return b.grossProfit-a.grossProfit}).slice(0,150);$('#productTableBody').innerHTML=l.map(function(p){var v=verdict(p);return '<tr><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.category)+'</td><td>'+yen(p.sales)+'</td><td>'+Number(p.units||0).toLocaleString()+'</td><td>'+yen(p.grossProfit)+'</td><td>'+p.margin+'%</td><td><span class="tag '+v[1]+'">'+v[0]+'</span></td></tr>'}).join('')}
   $('#productSearch').oninput=renderProductTable;
-  $('#csvInput').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var rows=parseCSV(r.result),h=rows[0].map(function(x){return x.trim()}),ix=function(n){return h.indexOf(n)},num=function(row,n){return Number(String(row[ix(n)]||'0').replace(/,/g,''))||0};var m=rows.slice(1).filter(function(row){return row[ix('商品名')]}).map(function(row){var s=num(row,'販売総売上'),g=num(row,'粗利総額'),u=num(row,'販売商品数');return {name:row[ix('商品名')],category:row[ix('カテゴリー')]||'未設定',sales:s,grossProfit:g,units:u,margin:s?Number((g/s*100).toFixed(1)):0}});if(m.length){sales=m;save('ippukuSales',sales);if(backendReady)pushSalesState();alert(m.length+'商品を読み込みました');renderAll()}}catch(err){alert('CSVを読み込めませんでした')}};r.readAsText(f,'Shift_JIS')};
+  $('#csvInput').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var rows=parseCSV(r.result),h=rows[0].map(function(x){return x.trim()}),ix=function(n){return h.indexOf(n)},num=function(row,n){return Number(String(row[ix(n)]||'0').replace(/,/g,''))||0};var m=rows.slice(1).filter(function(row){return row[ix('商品名')]}).map(function(row){var s=num(row,'販売総売上'),g=num(row,'粗利総額'),u=num(row,'販売商品数');return {name:row[ix('商品名')],category:row[ix('カテゴリー')]||'未設定',sales:s,grossProfit:g,units:u,margin:s?Number((g/s*100).toFixed(1)):0}});if(m.length){sales=m;save('ippukuSales',sales);saveSharedState('sales',sales);alert(m.length+'商品を読み込みました');renderAll()}}catch(err){alert('CSVを読み込めませんでした')}};r.readAsText(f,'Shift_JIS')};
   function parseCSV(t){var out=[],row=[],v='',q=false;for(var i=0;i<t.length;i++){var c=t[i],n=t[i+1];if(q){if(c==='"'&&n==='"'){v+='"';i++}else if(c==='"')q=false;else v+=c}else{if(c==='"')q=true;else if(c===','){row.push(v);v=''}else if(c==='\n'){row.push(v.replace(/\r$/,''));out.push(row);row=[];v=''}else v+=c}}if(v||row.length){row.push(v);out.push(row)}return out}
 
   function knownInventoryShops(){
@@ -738,7 +767,7 @@
         var v=inp.value.trim();
         item.stock=v===''?'':Number(v);
         save('ippukuInventory',inventory);
-        if(backendReady)pushSharedState('inventory',inventory);
+        saveSharedState('inventory',inventory);
 
         var hasStock=item.stock!==''&&item.stock!==null&&item.stock!==undefined&&!isNaN(Number(item.stock));
         var stock=hasStock?Number(item.stock):null;
@@ -785,7 +814,8 @@
         '<button class="ghost" data-close>取消</button><button class="primary-btn" id="saveInv">保存</button>'+
       '</div>',
       function(){
-        $('#saveInv').onclick=function(){
+        $('#saveInv').onclick=async function(){
+          var btn=this;
           var stockValue=$('#invStock').value.trim();
           var item={
             name:$('#invName').value.trim()||'未設定',
@@ -798,16 +828,27 @@
           if(!isNew&&x.note)item.note=x.note;
           if(isNew)inventory.push(item);else inventory[index]=item;
           save('ippukuInventory',inventory);
-          if(backendReady)pushSharedState('inventory',inventory);
-          closeModal();renderInventory();
+          renderInventory();
+
+          btn.disabled=true;
+          btn.textContent='保存中…';
+          var ok=backendReady?await saveSharedState('inventory',inventory):false;
+          closeModal();
+          if(!backendReady||!ok){
+            alert('この端末には保存しました。サーバーへの同期は自動で再試行します。');
+          }
         };
         var del=$('#deleteInventoryItem');
-        if(del)del.onclick=function(){
+        if(del)del.onclick=async function(){
           if(!confirm('この在庫商品を削除しますか？'))return;
           inventory.splice(index,1);
           save('ippukuInventory',inventory);
-          if(backendReady)pushSharedState('inventory',inventory);
-          closeModal();renderInventory();
+          renderInventory();
+          var ok=backendReady?await saveSharedState('inventory',inventory):false;
+          closeModal();
+          if(!backendReady||!ok){
+            alert('この端末では削除済みです。サーバーへの同期は自動で再試行します。');
+          }
         };
       }
     );
@@ -903,8 +944,8 @@
   var addInventoryBtn=$('#addInventoryBtn');
   if(addInventoryBtn)addInventoryBtn.onclick=function(){openInventoryEditor(-1)};
 
-  function renderReserves(){$('#reserveList').innerHTML=reserves.length?reserves.map(function(r,i){return '<div class="reserve-card"><div><b>'+esc(r.item)+' ×'+r.qty+'</b><small>'+esc(r.name||'お客様')+' / 来店 '+esc(r.date)+' '+esc(r.time||'')+'</small></div><span class="status waiting">'+esc(r.date)+'</span><button class="ghost" data-del-res="'+i+'">完了</button></div>'}).join(''):'<div class="panel note">取り置きはありません。</div>';$$('[data-del-res]').forEach(function(b){b.onclick=function(){reserves.splice(Number(b.dataset.delRes),1);save('ippukuReserves',reserves);if(backendReady)pushSharedState('reserves',reserves);renderAll()}})}
-  $('#addReserveBtn').onclick=function(){showModal('<h3>取り置き追加</h3><div class="form-row"><label>お客様名</label><input id="resName"></div><div class="form-row"><label>商品・銘柄</label><input id="resItem"></div><div class="form-row"><label>個数</label><input id="resQty" type="number" value="1"></div><div class="form-row"><label>来店日</label><input id="resDate" type="date"></div><div class="form-row"><label>時間</label><input id="resTime" type="time"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="saveRes">追加</button></div>',function(){$('#saveRes').onclick=function(){reserves.push({name:$('#resName').value,item:$('#resItem').value||'未設定',qty:Number($('#resQty').value)||1,date:$('#resDate').value,time:$('#resTime').value});save('ippukuReserves',reserves);if(backendReady)pushSharedState('reserves',reserves);closeModal();renderAll()}})};
+  function renderReserves(){$('#reserveList').innerHTML=reserves.length?reserves.map(function(r,i){return '<div class="reserve-card"><div><b>'+esc(r.item)+' ×'+r.qty+'</b><small>'+esc(r.name||'お客様')+' / 来店 '+esc(r.date)+' '+esc(r.time||'')+'</small></div><span class="status waiting">'+esc(r.date)+'</span><button class="ghost" data-del-res="'+i+'">完了</button></div>'}).join(''):'<div class="panel note">取り置きはありません。</div>';$$('[data-del-res]').forEach(function(b){b.onclick=function(){reserves.splice(Number(b.dataset.delRes),1);save('ippukuReserves',reserves);saveSharedState('reserves',reserves);renderAll()}})}
+  $('#addReserveBtn').onclick=function(){showModal('<h3>取り置き追加</h3><div class="form-row"><label>お客様名</label><input id="resName"></div><div class="form-row"><label>商品・銘柄</label><input id="resItem"></div><div class="form-row"><label>個数</label><input id="resQty" type="number" value="1"></div><div class="form-row"><label>来店日</label><input id="resDate" type="date"></div><div class="form-row"><label>時間</label><input id="resTime" type="time"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="saveRes">追加</button></div>',function(){$('#saveRes').onclick=function(){reserves.push({name:$('#resName').value,item:$('#resItem').value||'未設定',qty:Number($('#resQty').value)||1,date:$('#resDate').value,time:$('#resTime').value});save('ippukuReserves',reserves);saveSharedState('reserves',reserves);closeModal();renderAll()}})};
 
 
   function normName(v){return String(v||'').replace(/[・･\s　]/g,'').toLowerCase()}
@@ -949,8 +990,8 @@
       '<div class="promo-manage-list">'+(rows||'<p class="note">POPはまだありません。</p>')+'</div><div class="modal-actions"><button class="ghost" data-close>閉じる</button><button class="primary-btn" id="addPromo">＋ POP追加</button></div>',function(){
         $('#addPromo').onclick=function(){editPromo(-1)};
         $$('[data-edit-promo]').forEach(function(b){b.onclick=function(){editPromo(Number(b.dataset.editPromo))}});
-        $$('[data-del-promo]').forEach(function(b){b.onclick=function(){promos.splice(Number(b.dataset.delPromo),1);save('ippukuPromos',promos);if(backendReady)pushSharedState('promos',promos);closeModal();renderPromoManager()}});
-        $$('[data-auto-promo]').forEach(function(b){b.onclick=function(){var n=b.dataset.autoPromo;if(!promos.some(function(p){return p.product===n})){var c=defaultPromoCopy(n);promos.push({product:n,tag:c.tag,headline:c.headline,copy:c.copy,active:true});save('ippukuPromos',promos);if(backendReady)pushSharedState('promos',promos)}closeModal();renderPromoManager()}});
+        $$('[data-del-promo]').forEach(function(b){b.onclick=function(){promos.splice(Number(b.dataset.delPromo),1);save('ippukuPromos',promos);saveSharedState('promos',promos);closeModal();renderPromoManager()}});
+        $$('[data-auto-promo]').forEach(function(b){b.onclick=function(){var n=b.dataset.autoPromo;if(!promos.some(function(p){return p.product===n})){var c=defaultPromoCopy(n);promos.push({product:n,tag:c.tag,headline:c.headline,copy:c.copy,active:true});save('ippukuPromos',promos);saveSharedState('promos',promos)}closeModal();renderPromoManager()}});
       });
   }
   function editPromo(index){
@@ -958,7 +999,7 @@
     var c=current||defaultPromoCopy(selected);
     showModal('<h3>'+(index>=0?'POPを編集':'POPを追加')+'</h3><div class="form-row"><label>宣伝する商品</label><select id="promoProduct">'+menu.map(function(m){return '<option '+(m.name===selected?'selected':'')+'>'+esc(m.name)+'</option>'}).join('')+'</select></div><div class="form-row"><label>小見出し</label><input id="promoTag" value="'+esc(c.tag||'')+'" placeholder="例：スタッフおすすめ"></div><div class="form-row"><label>大きな見出し</label><input id="promoHeadline" value="'+esc(c.headline||'')+'" placeholder="例：まずは、ほっと一杯。"></div><div class="form-row"><label>宣伝文</label><input id="promoCopy" value="'+esc(c.copy||'')+'" placeholder="商品の魅力を短く"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="savePromo">保存</button></div>',function(){
       $('#promoProduct').onchange=function(){var d=defaultPromoCopy(this.value);$('#promoTag').value=d.tag;$('#promoHeadline').value=d.headline;$('#promoCopy').value=d.copy};
-      $('#savePromo').onclick=function(){var p={product:$('#promoProduct').value,tag:$('#promoTag').value||'おすすめ',headline:$('#promoHeadline').value||$('#promoProduct').value,copy:$('#promoCopy').value||'ぜひ一度お試しください。',active:true};if(index>=0)promos[index]=p;else promos.push(p);save('ippukuPromos',promos);if(backendReady)pushSharedState('promos',promos);closeModal();};
+      $('#savePromo').onclick=function(){var p={product:$('#promoProduct').value,tag:$('#promoTag').value||'おすすめ',headline:$('#promoHeadline').value||$('#promoProduct').value,copy:$('#promoCopy').value||'ぜひ一度お試しください。',active:true};if(index>=0)promos[index]=p;else promos.push(p);save('ippukuPromos',promos);saveSharedState('promos',promos);closeModal();};
     });
   }
 
