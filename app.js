@@ -262,7 +262,7 @@
     var result=await apiRequest('/api/state/sales');
     if(!result.ok||!result.data)return;
 
-    if(result.data.exists&&Array.isArray(result.data.value)){
+    if(result.data.exists&&Array.isArray(result.data.value)&&result.data.value.length){
       sales=result.data.value;
       save('ippukuSales',sales);
       renderDashboard();
@@ -270,8 +270,12 @@
       return;
     }
 
+    // Safariしか使えない場合でも、この端末に残っている売上データを
+    // 初回だけ共有データとしてD1へ自動保存する。
     if(Array.isArray(sales)&&sales.length){
       await pushSalesState();
+      renderDashboard();
+      renderAnalytics();
     }
   }
 
