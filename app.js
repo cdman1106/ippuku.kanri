@@ -15,149 +15,140 @@
   ]);
   var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', inventoryShopFilter='all', customerSeat=new URLSearchParams(location.search).get('seat')||load('ippukuCustomerSeat','')||'';
   var seatAccess={}, seatAccessMeta={}, customerSeatOpen=true, customerDrinkSatisfied=false, customerSeatTimer=null;
-  var INVENTORY_SEED_VERSION=5;
+  var INVENTORY_SEED_VERSION=6;
   var INVENTORY_SEED=[
-    {name:'ガムシロップ',stock:'',min:6,unit:'個',source:'スタンバイ'},
-    {name:'コーヒーフレッシュ',stock:'',min:20,unit:'個',source:'スタンバイ'},
-    {name:'スティックシュガー',stock:'',min:20,unit:'本',source:'スタンバイ'},
-    {name:'マドラー',stock:'',min:20,unit:'本',source:'スタンバイ'},
-    {name:'ストロー',stock:'',min:20,unit:'本',source:'スタンバイ'},
-    {name:'プラカップ',stock:'',min:30,unit:'個',source:'スタンバイ'},
-    {name:'花見糖',stock:'',min:1,unit:'本',source:'スタンバイ'},
-    {name:'コーヒーゼリー',stock:'',min:1,unit:'タッパー',source:'スタンバイ'},
-    {name:'チーズケーキ（冷蔵庫）',stock:'',min:4,unit:'個',source:'スタンバイ'},
-    {name:'ベリーソース',stock:'',min:0.5,unit:'本',source:'スタンバイ'},
-    {name:'ゆず蜜原液',stock:'',min:0.5,unit:'本',source:'スタンバイ'},
-    {name:'チョコチーノ原液',stock:'',min:1,unit:'本',source:'スタンバイ'},
-    {name:'抹茶原液',stock:'',min:1,unit:'本',source:'スタンバイ'},
-    {name:'ホイップ',stock:'',min:1,unit:'袋',source:'スタンバイ'},
-    {name:'アイスコーヒー',stock:'',min:3,unit:'本',source:'スタンバイ'},
-    {name:'アイスティー',stock:'',min:1,unit:'本',source:'スタンバイ'},
-    {name:'コーラ',stock:'',min:4,unit:'本',source:'スタンバイ'},
-    {name:'みかんジュース',stock:'',min:4,unit:'本',source:'スタンバイ'},
-    {name:'りんご',stock:'',min:4,unit:'本',source:'スタンバイ'},
-    {name:'モンスター',stock:'',min:4,unit:'本',source:'スタンバイ'},
-    {name:'ペリエ',stock:'',min:4,unit:'本',source:'スタンバイ'},
-    {name:'炭酸水',stock:'',min:2,unit:'本',source:'スタンバイ'},
-    {name:'ポパイサンド',stock:'',min:3,unit:'個',source:'スタンバイ'},
-    {name:'あんバターサンド',stock:'',min:3,unit:'個',source:'スタンバイ'},
-    {name:'チーズケーキ（冷凍庫）',stock:'',min:2,unit:'個',source:'スタンバイ'},
+    {name:'ガムシロップ',stock:'',min:6,unit:'個',source:'スタンバイ・作業台周辺'},
+    {name:'コーヒーフレッシュ',stock:'',min:20,unit:'個',source:'スタンバイ・作業台周辺'},
+    {name:'スティックシュガー',stock:'',min:20,unit:'本',source:'スタンバイ・作業台周辺'},
+    {name:'マドラー',stock:'',min:20,unit:'本',source:'スタンバイ・作業台周辺'},
+    {name:'ストロー',stock:'',min:20,unit:'本',source:'スタンバイ・作業台周辺'},
+    {name:'プラカップ',stock:'',min:30,unit:'個',source:'スタンバイ・作業台周辺'},
 
-    {name:'紅茶 Twining',stock:'',min:3,unit:'pack/各種',source:'買出し・棚1'},
-    {name:'ココア',stock:'',min:2,unit:'袋',source:'買出し・棚2'},
-    {name:'抹茶',stock:'',min:2,unit:'袋',source:'買出し・棚2'},
-    {name:'ルイボス',stock:'',min:20,unit:'bag',source:'買出し・棚2'},
-    {name:'紅茶（日東）',stock:'',min:20,unit:'bag',source:'買出し・棚2'},
-    {name:'インスタントコーヒー',stock:'',min:0.25,unit:'袋',source:'買出し・棚3'},
-    {name:'コーヒー豆',stock:2,min:3,unit:'袋',source:'買出し・棚3',note:'手書き現在数 2'},
-    {name:'ゼラチン',stock:'',min:0.25,unit:'袋',source:'買出し・棚3'},
-    {name:'ナッツ',stock:'',min:5,unit:'袋',source:'買出し・棚3'},
-    {name:'マジックソルト',stock:'',min:2,unit:'袋',source:'買出し・棚4'},
-    {name:'チョコソース',stock:'',min:1,unit:'本',source:'買出し・棚4'},
-    {name:'キャラメルソース',stock:'',min:1,unit:'本',source:'買出し・棚4'},
-    {name:'花見糖',stock:'',min:0.5,unit:'袋',source:'買出し・棚4'},
-    {name:'上白糖',stock:'',min:0.5,unit:'袋',source:'買出し・棚4'},
-    {name:'プラカップ',stock:'',min:5,unit:'包（50cup）',source:'買出し・棚4'},
-    {name:'ストロー',stock:'',min:50,unit:'本',source:'買出し・棚5'},
+    {name:'花見糖',stock:'',min:1.2,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'コーヒーゼリー',stock:'',min:1,unit:'タッパー',source:'スタンバイ・冷蔵庫'},
+    {name:'チーズケーキ',stock:'',min:4,unit:'個',source:'スタンバイ・冷蔵庫'},
+    {name:'ベリーソース',stock:'',min:0.5,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'ゆず蜜原液',stock:'',min:0.5,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'チョコチー原液',stock:'',min:1,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'抹茶原液',stock:'',min:1,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'シロップ漬け苺',stock:'',min:4,unit:'個',source:'スタンバイ・冷蔵庫'},
+    {name:'ホイップ',stock:'',min:1,unit:'袋',source:'スタンバイ・冷蔵庫'},
+    {name:'アイスコーヒー',stock:'',min:3,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'アイスティー',stock:'',min:1,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'コーラ',stock:'',min:4,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'みかんJ',stock:'',min:4,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'りんご',stock:'',min:4,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'モンスター',stock:'',min:4,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'ペリエ',stock:'',min:4,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'炭酸水',stock:'',min:2,unit:'本',source:'スタンバイ・冷蔵庫'},
+    {name:'ポパイサンド',stock:'',min:3,unit:'個',source:'スタンバイ・冷蔵庫'},
+    {name:'あんバターサンド',stock:'',min:3,unit:'個',source:'スタンバイ・冷蔵庫'},
+    {name:'チーズケーキ',stock:'',min:2,unit:'個',source:'スタンバイ・冷凍庫'},
 
-    {name:'ペリエ',stock:'',min:15,unit:'本',source:'買出し・冷蔵庫'},
-    {name:'コーラ',stock:'',min:5,unit:'本',source:'買出し・冷蔵庫'},
-    {name:'りんご炭酸',stock:'',min:10,unit:'本',source:'買出し・冷蔵庫'},
-    {name:'モンスター',stock:'',min:15,unit:'本',source:'買出し・冷蔵庫'},
-    {name:'炭酸水',stock:'',min:5,unit:'本',source:'買出し・冷蔵庫'},
-    {name:'みかん',stock:'',min:5,unit:'本',source:'買出し・冷蔵庫'},
-    {name:'牛乳',stock:'',min:3,unit:'本',source:'買出し・冷蔵庫'},
+    {name:'紅茶Twining',stock:'',min:3,unit:'pack/各種',source:'買出し・棚1',shop:'コスモス'},
+    {name:'ココア',stock:'',min:2,unit:'袋',source:'買出し・棚2',shop:'コスモス'},
+    {name:'抹茶',stock:'',min:2,unit:'袋',source:'買出し・棚2',shop:'コスモス'},
+    {name:'ルイボス',stock:'',min:20,unit:'bag',source:'買出し・棚2',shop:'コスモス'},
+    {name:'紅茶(日東)',stock:'',min:20,unit:'bag',source:'買出し・棚2',shop:'イオン'},
 
-    {name:'カフェラテ原液',stock:1,min:3,unit:'本',source:'買出し・シンク下',note:'手書き現在数 1'},
-    {name:'キャラマキ原液',stock:2,min:2,unit:'本',source:'買出し・シンク下',note:'手書き現在数 2'},
+    {name:'インスタントコーヒー',stock:'',min:0.25,unit:'袋',source:'買出し・棚3',shop:'コスモス'},
+    {name:'コーヒー豆',stock:'',min:3,unit:'袋(冬期半量)',source:'買出し・棚3',shop:'業務スーパー'},
+    {name:'ゼラチン',stock:'',min:0.25,unit:'袋',source:'買出し・棚3',shop:'ネット'},
+    {name:'ナッツ',stock:'',min:5,unit:'袋',source:'買出し・棚3',shop:'コストコ'},
 
-    {name:'パン（ホットサンド）',stock:'',min:3,unit:'袋（各）',source:'買出し・冷蔵庫チルド'},
-    {name:'チーズ',stock:'',min:10,unit:'枚',source:'買出し・冷蔵庫チルド'},
-    {name:'マヨネーズ',stock:'',min:0.25,unit:'本',source:'買出し・冷蔵庫チルド'},
-    {name:'バター風味',stock:'',min:0.5,unit:'箱',source:'買出し・冷蔵庫チルド'},
+    {name:'マジックソルト',stock:'',min:2,unit:'袋',source:'買出し・棚4',shop:'コスモス'},
+    {name:'チョコソース',stock:'',min:1,unit:'本',source:'買出し・棚4',shop:'業務スーパー'},
+    {name:'キャラメルソース',stock:'',min:1,unit:'本',source:'買出し・棚4',shop:'業務スーパー'},
+    {name:'プラカップ',stock:'',min:5,unit:'包(@50cup)',source:'買出し・棚4',shop:'ネット'},
+    {name:'ストロー',stock:'',min:50,unit:'本',source:'買出し・棚5',shop:'アスクル'},
 
-    {name:'アイスクリーム',stock:'',min:0.25,unit:'箱',source:'買出し・冷凍庫'},
-    {name:'ホイップクリーム',stock:'',min:3,unit:'袋',source:'買出し・冷凍庫'},
-    {name:'ワッフル',stock:'',min:5,unit:'個',source:'買出し・冷凍庫'},
-    {name:'チーズケーキ',stock:'',min:2,unit:'個',source:'買出し・冷凍庫'},
-    {name:'ほうれん草',stock:'',min:0.3,unit:'袋',source:'買出し・冷凍庫'},
-    {name:'きのこ',stock:'',min:2,unit:'袋（125g×2）',source:'買出し・冷凍庫'},
-    {name:'ハム',stock:'',min:3,unit:'袋',source:'買出し・冷凍庫'},
+    {name:'ペリエ',stock:'',min:15,unit:'本',source:'買出し・冷蔵庫',shop:'ネット'},
+    {name:'コーラ',stock:'',min:5,unit:'本',source:'買出し・冷蔵庫',shop:'コスモス'},
+    {name:'りんご炭酸',stock:'',min:10,unit:'本',source:'買出し・冷蔵庫',shop:'ネット'},
+    {name:'モンスター',stock:'',min:15,unit:'本',source:'買出し・冷蔵庫',shop:'ネット'},
+    {name:'炭酸水',stock:'',min:5,unit:'本',source:'買出し・冷蔵庫',shop:'コストコ'},
+    {name:'みかん',stock:'',min:5,unit:'本',source:'買出し・冷蔵庫',shop:'コスモス'},
+    {name:'牛乳',stock:'',min:3,unit:'本',source:'買出し・冷蔵庫',shop:'コスモス'},
 
-    {name:'ゆず蜜',stock:'',min:0.25,unit:'瓶',source:'買出し・野菜室'},
-    {name:'ジャム（ブルーベリー）',stock:'',min:0.25,unit:'瓶',source:'買出し・野菜室'},
-    {name:'あんこ',stock:'',min:0.25,unit:'瓶',source:'買出し・野菜室'},
-    {name:'ライター用オイル',stock:'',min:1,unit:'本',source:'買出し・その他'}
+    {name:'カフェラテ原液',stock:'',min:3,unit:'本',source:'買出し・シンク下',shop:'コスモス'},
+    {name:'キャラマキ原液',stock:'',min:2,unit:'本',source:'買出し・シンク下',shop:'コスモス'},
+    {name:'メロン原液',stock:'',min:2,unit:'本',source:'買出し・シンク下',shop:'コスモス'},
+
+    {name:'パン(ホットサンド)',stock:'',min:3,unit:'個(各)',source:'買出し・冷蔵庫チルド',shop:'コスモス'},
+    {name:'チーズ',stock:'',min:10,unit:'枚',source:'買出し・冷蔵庫チルド',shop:'業務スーパー'},
+    {name:'マヨネーズ',stock:'',min:0.25,unit:'本',source:'買出し・冷蔵庫チルド',shop:'コスモス'},
+    {name:'バター風味',stock:'',min:0.5,unit:'箱',source:'買出し・冷蔵庫チルド',shop:'業務スーパー'},
+
+    {name:'アイスクリーム',stock:'',min:0.25,unit:'箱',source:'買出し・冷凍庫',shop:'コストコ'},
+    {name:'ワッフル',stock:'',min:5,unit:'個',source:'買出し・冷凍庫',shop:'業務スーパー'},
+    {name:'チーズケーキ',stock:'',min:2,unit:'個',source:'買出し・冷凍庫',shop:'業務スーパー'},
+    {name:'ほうれん草',stock:'',min:0.3,unit:'袋',source:'買出し・冷凍庫',shop:'業務スーパー'},
+    {name:'きのこ',stock:'',min:2,unit:'袋(125gx2)',source:'買出し・冷凍庫',shop:'コストコ'}
   ];
 
   function inventoryKey(x){return String(x.name||'')+'|'+String(x.source||'')}
-  var INVENTORY_SHOP_DEFAULTS={
-    '紅茶 Twining|買出し・棚1':'コスモス / 業スー',
-    'ココア|買出し・棚2':'コスモス',
-    '抹茶|買出し・棚2':'コスモス',
-    'ルイボス|買出し・棚2':'コスモス',
-    '紅茶（日東）|買出し・棚2':'イオン',
-    'インスタントコーヒー|買出し・棚3':'コスモス',
-    'コーヒー豆|買出し・棚3':'業スー',
-    'ゼラチン|買出し・棚3':'ネット',
-    'ナッツ|買出し・棚3':'コストコ',
-    'マジックソルト|買出し・棚4':'コスモス',
-    'チョコソース|買出し・棚4':'業スー',
-    'キャラメルソース|買出し・棚4':'業スー',
-    '花見糖|買出し・棚4':'コスモス',
-    '上白糖|買出し・棚4':'コスモス',
-    'プラカップ|買出し・棚4':'ネット',
-    'ストロー|買出し・棚5':'アスクル',
-
-    'ペリエ|買出し・冷蔵庫':'ネット',
-    'コーラ|買出し・冷蔵庫':'コスモス',
-    'りんご炭酸|買出し・冷蔵庫':'ネット',
-    'モンスター|買出し・冷蔵庫':'ネット',
-    '炭酸水|買出し・冷蔵庫':'コストコ',
-    'みかん|買出し・冷蔵庫':'コスモス',
-    '牛乳|買出し・冷蔵庫':'コスモス',
-
-    'カフェラテ原液|買出し・シンク下':'コスモス',
-    'キャラマキ原液|買出し・シンク下':'コスモス',
-
-    'パン（ホットサンド）|買出し・冷蔵庫チルド':'コスモス',
-    'チーズ|買出し・冷蔵庫チルド':'業スー',
-    'マヨネーズ|買出し・冷蔵庫チルド':'コスモス',
-    'バター風味|買出し・冷蔵庫チルド':'業スー',
-
-    'アイスクリーム|買出し・冷凍庫':'イオン',
-    'ワッフル|買出し・冷凍庫':'業スー',
-    'チーズケーキ|買出し・冷凍庫':'業スー',
-    'ほうれん草|買出し・冷凍庫':'業スー',
-    'きのこ|買出し・冷凍庫':'コストコ',
-    'ハム|買出し・冷凍庫':'業スー',
-
-    'ゆず蜜|買出し・野菜室':'業スー',
-    'ジャム（ブルーベリー）|買出し・野菜室':'業スー',
-    'あんこ|買出し・野菜室':'業スー',
-    'ライター用オイル|買出し・その他':'Mr.Max'
-  };
-  INVENTORY_SEED.forEach(function(x){
-    x.shop=INVENTORY_SHOP_DEFAULTS[inventoryKey(x)]||x.shop||'';
-  });
+  function inventoryNormName(v){
+    return String(v||'')
+      .replace(/[（）]/g,function(m){return m==='（'?'(':')'})
+      .replace(/[・･\s　]/g,'')
+      .replace('チョコチーノ原液','チョコチー原液')
+      .replace('みかんジュース','みかんJ')
+      .replace('紅茶（日東）','紅茶(日東)')
+      .replace('紅茶Twining','紅茶Twining')
+      .replace('紅茶 Twining','紅茶Twining')
+      .toLowerCase();
+  }
+  function legacyInventoryMatch(seed,old){
+    if(inventoryNormName(seed.name)!==inventoryNormName(old.name))return false;
+    if(String(seed.source).indexOf('スタンバイ')===0){
+      if(String(old.source||'').indexOf('スタンバイ')!==0)return false;
+      if(seed.name==='チーズケーキ'){
+        var oldName=String(old.name||'');
+        if(seed.source==='スタンバイ・冷蔵庫'&&oldName.indexOf('冷凍庫')>=0)return false;
+        if(seed.source==='スタンバイ・冷凍庫'&&oldName.indexOf('冷蔵庫')>=0)return false;
+        if(oldName==='チーズケーキ')return String(old.source||'').indexOf('冷凍庫')>=0?seed.source==='スタンバイ・冷凍庫':seed.source==='スタンバイ・冷蔵庫';
+      }
+      return true;
+    }
+    return String(seed.source||'')===String(old.source||'');
+  }
 
   if(load('ippukuInventorySeedVersion',0)<INVENTORY_SEED_VERSION){
-    if(!inventory.length){
-      inventory=INVENTORY_SEED.map(function(x){return Object.assign({},x)});
-    }else{
-      var existingByKey={};
-      inventory.forEach(function(x){existingByKey[inventoryKey(x)]=x});
-      INVENTORY_SEED.forEach(function(seed){
-        var old=existingByKey[inventoryKey(seed)];
-        if(old){
-          if(!old.shop&&seed.shop)old.shop=seed.shop;
-          if(old.min===undefined||old.min===null)old.min=seed.min;
-          if(!old.unit)old.unit=seed.unit;
-        }else{
-          inventory.push(Object.assign({},seed));
-        }
-      });
-    }
+    var previousInventory=inventory.slice();
+    var usedLegacy={};
+    var nextInventory=INVENTORY_SEED.map(function(seed){
+      var foundIndex=-1;
+      for(var i=0;i<previousInventory.length;i++){
+        if(usedLegacy[i])continue;
+        if(legacyInventoryMatch(seed,previousInventory[i])){foundIndex=i;break}
+      }
+      var old=foundIndex>=0?previousInventory[foundIndex]:null;
+      if(foundIndex>=0)usedLegacy[foundIndex]=true;
+      var next=Object.assign({},seed);
+      if(old){
+        next.stock=old.stock;
+        if(old.note)next.note=old.note;
+      }
+      return next;
+    });
+
+    var obsoleteLegacyNames={
+      '花見糖|買出し・棚4':true,
+      '上白糖|買出し・棚4':true,
+      'ホイップクリーム|買出し・冷凍庫':true,
+      'ハム|買出し・冷凍庫':true,
+      'ゆず蜜|買出し・野菜室':true,
+      'ジャム（ブルーベリー）|買出し・野菜室':true,
+      'あんこ|買出し・野菜室':true,
+      'ライター用オイル|買出し・その他':true
+    };
+    previousInventory.forEach(function(old,i){
+      if(usedLegacy[i])return;
+      if(obsoleteLegacyNames[inventoryKey(old)])return;
+      nextInventory.push(old);
+    });
+
+    inventory=nextInventory;
     save('ippukuInventory',inventory);
     save('ippukuInventorySeedVersion',INVENTORY_SEED_VERSION);
   }
