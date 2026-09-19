@@ -454,7 +454,8 @@
   }
 
   function page(name){
-    $$('.page').forEach(function(p){p.classList.toggle('active',p.dataset.page===name)});
+    if(name==='customer')document.documentElement.classList.remove('order-route-loading');
+    $('.page').forEach(function(p){p.classList.toggle('active',p.dataset.page===name)});
     $$('.nav-item').forEach(function(b){b.classList.toggle('active',b.dataset.go===name)});
     $('#bottomNav').style.display=name==='customer'?'none':'flex'; $('.topbar').style.display=name==='customer'?'none':'flex'; document.body.classList.toggle('customer-mode',name==='customer');
     var t={dashboard:'店舗ダッシュボード',seats:'座席・注文管理',orders:'注文一覧',analytics:'売上分析',inventory:'在庫・発注',reserve:'取り置き管理',settings:'設定'};
@@ -1242,10 +1243,9 @@
       return '<div class="qr-link"><b>'+s+'</b><br><a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a></div>';
     }).join('');
   };
-  function showModal(html,after){$('#modal').innerHTML=html;$('#modalBackdrop').classList.add('show');$$('[data-close]').forEach(function(b){b.onclick=closeModal});if(after)after()} function closeModal(){$('#modalBackdrop').classList.remove('show')} $('#modalBackdrop').onclick=function(e){if(e.target===$('#modalBackdrop'))closeModal()};
+  function showModal(html,after){$('#modal').innerHTML=html;$('#modalBackdrop').classList.add('show');$('[data-close]').forEach(function(b){b.onclick=closeModal});if(after)after()} function closeModal(){$('#modalBackdrop').classList.remove('show')} $('#modalBackdrop').onclick=function(e){if(e.target===$('#modalBackdrop'))closeModal()};
   function renderAll(){renderDashboard();renderOrders();renderAnalytics();renderInventory();renderReserves();renderSeats()}
-  renderAll();
-  detectBackend();
+
   function syncRoute(){
     var route=orderRouteInfo();
     if(route.order){
@@ -1254,10 +1254,20 @@
         save('ippukuCustomerSeat',customerSeat);
       }
       page('customer');
-      return;
+      return true;
     }
+    return false;
   }
+
   window.addEventListener('hashchange',syncRoute);
   window.addEventListener('popstate',syncRoute);
-  syncRoute();
+
+  // 注文URLでは、スタッフ用ダッシュボードの初期描画より先に
+  // 必ずお客様の注文画面を開く。スタッフ画面側に不具合があっても
+  // QR注文画面へ影響させない。
+  var startedAsCustomer=syncRoute();
+  if(!startedAsCustomer){
+    renderAll();
+  }
+  detectBackend();
 })();
