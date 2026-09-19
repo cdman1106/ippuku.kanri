@@ -8,22 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>いっぷく 店舗管理</title>
-<script id="orderRouteBootstrap">
-(function(){
-  try{
-    var q=new URLSearchParams(location.search);
-    var h=String(location.hash||'');
-    var isOrder=q.has('seat')||q.get('order')==='1'||q.get('mode')==='order'||h==='#order'||h.indexOf('#order?')===0||h.indexOf('#order&')===0;
-    if(isOrder)document.documentElement.classList.add('order-route-loading');
-  }catch(e){}
-})();
-</script>
 <link rel="stylesheet" href="./styles.css?v=20260919-12">
-<style>
-html.order-route-loading .page{display:none!important}
-html.order-route-loading body.customer-mode .page.customer-page,
-html.order-route-loading .page.customer-page.active{display:block!important}
-</style>
 </head>
 <body>
 <div id="app">
@@ -209,6 +194,6 @@ html.order-route-loading .page.customer-page.active{display:block!important}
 
 <script src="./sales-data.js?v=20260919-1"></script>
 <script src="./menu-data.js?v=20260919-10"></script>
-<script src="./app.js?v=20260919-17"></script>
+<script src="./app.js?v=20260919-18"></script>
 </body>
 </html>
