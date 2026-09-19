@@ -744,28 +744,15 @@
       return '<section class="inventory-section"><div class="inventory-section-head"><h3>'+esc(section)+'</h3><span>'+groups[section].length+'品</span></div>'+cards+'</section>';
     }).join('')+'</div>';
 
-    var stockInputs=$('[data-stock]');
+    var stockInputs=$$('[data-stock]');
     stockInputs.forEach(function(inp,pos){
-      inp.onfocus=function(){
-        // PC入力時は現在値を全選択。数字を打つだけで置き換えられる。
-        try{inp.select()}catch(e){}
-      };
-      inp.onkeydown=function(e){
-        // Enterでも次の在庫数欄へ。Tab/Shift+Tabはブラウザ標準で前後の在庫欄へ移動。
-        if(e.key==='Enter'){
-          e.preventDefault();
-          inp.blur();
-          var next=stockInputs[pos+1];
-          if(next){next.focus();try{next.select()}catch(err){}}
-        }
-      };
-      inp.onchange=function(){
+      function applyStockInput(syncServer){
         var index=Number(inp.dataset.stock);
         var item=inventory[index];
+        if(!item)return;
+
         var v=inp.value.trim();
         item.stock=v===''?'':Number(v);
-        save('ippukuInventory',inventory);
-        saveSharedState('inventory',inventory);
 
         var hasStock=item.stock!==''&&item.stock!==null&&item.stock!==undefined&&!isNaN(Number(item.stock));
         var stock=hasStock?Number(item.stock):null;
@@ -780,6 +767,30 @@
         if(metaEl){
           var base=metaEl.dataset.stockBase||'';
           metaEl.textContent=base+(low?' ・ 買出し必要':'');
+        }
+
+        save('ippukuInventory',inventory);
+        if(syncServer)saveSharedState('inventory',inventory);
+      }
+
+      inp.onfocus=function(){
+        try{inp.select()}catch(e){}
+      };
+      inp.oninput=function(){
+        // 入力した瞬間にステータス表示へ反映。
+        applyStockInput(false);
+      };
+      inp.onchange=function(){
+        // 入力確定時にサーバーへ同期。
+        applyStockInput(true);
+      };
+      inp.onkeydown=function(e){
+        if(e.key==='Enter'){
+          e.preventDefault();
+          applyStockInput(true);
+          var next=stockInputs[pos+1];
+          if(next){next.focus();try{next.select()}catch(err){}}
+          else inp.blur();
         }
       };
     });
