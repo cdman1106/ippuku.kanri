@@ -13,7 +13,26 @@
     {product:'コーヒー',tag:'いっぷくおすすめ',headline:'まずは、ほっと一杯。',copy:'喫煙時間のお供に。ゆっくり過ごしたい時の定番です。',active:true},
     {product:'キャラメルマキアート',tag:'甘めが好きな方へ',headline:'少し贅沢な一杯を。',copy:'ゆっくり過ごしたい時におすすめのカフェメニューです。',active:true}
   ]);
-  var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', inventoryShopFilter='all', customerSeat=new URLSearchParams(location.search).get('seat')||load('ippukuCustomerSeat','')||'';
+  function orderRouteInfo(){
+    var search=new URLSearchParams(location.search);
+    var hash=String(location.hash||'').replace(/^#/,'');
+    var hashQuery='';
+    if(hash.indexOf('?')>=0)hashQuery=hash.slice(hash.indexOf('?')+1);
+    else if(hash.indexOf('&')>=0)hashQuery=hash.slice(hash.indexOf('&')+1);
+    var hashParams=new URLSearchParams(hashQuery);
+    var seat=search.get('seat')||hashParams.get('seat')||'';
+    var orderMode=
+      search.get('order')==='1'||
+      search.get('mode')==='order'||
+      hash==='order'||
+      hash.indexOf('order?')===0||
+      hash.indexOf('order&')===0||
+      location.pathname.replace(/\/+$/,'').endsWith('/order')||
+      !!seat;
+    return {order:orderMode,seat:seat};
+  }
+  var initialOrderRoute=orderRouteInfo();
+  var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', inventoryShopFilter='all', customerSeat=initialOrderRoute.seat||load('ippukuCustomerSeat','')||'';
   var seatAccess={}, seatAccessMeta={}, customerSeatOpen=true, customerDrinkSatisfied=false, customerSeatTimer=null;
   var INVENTORY_SEED_VERSION=7;
   var INVENTORY_SEED=[
@@ -443,7 +462,7 @@
     if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory'){renderInventory();if(backendReady)syncSharedStateKey('inventory')} if(name==='reserve'){renderReserves();if(backendReady)syncSharedStateKey('reserves')} if(name==='customer'){renderCustomer();if(backendReady)syncSharedStateKey('promos');startCustomerSeatWatch()}else{stopCustomerSeatWatch()}
     window.scrollTo(0,0);
   }
-  $$('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){if(location.hash!=='#order')location.hash='order';page('customer')}; $('#refreshBtn').onclick=renderAll;
+  $('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){history.replaceState(null,'',location.pathname+'?order=1');customerSeat='';page('customer')}; $('#refreshBtn').onclick=renderAll;
   $('#enableOrderSound').onclick=enableOrderSound;
   $('#stopOrderAlarm').onclick=stopOrderAlarm;
   updateSoundButton();
@@ -1209,14 +1228,31 @@
   }
   $('#checkoutBtn').onclick=openCartModal;
   $('#managePromos').onclick=renderPromoManager;
-  $('#showQrLinks').onclick=function(){var p=$('#qrLinksPanel');p.style.display=p.style.display==='none'?'block':'none';var base=location.href.split('?')[0].split('#')[0];$('#qrLinks').innerHTML=SEATS.map(function(s){return '<div class="qr-link"><b>'+s+'</b><br>'+base+'?seat='+encodeURIComponent(s)+'#order</div>'}).join('')};
+  $('#showQrLinks').onclick=function(){
+    var p=$('#qrLinksPanel');
+    p.style.display=p.style.display==='none'?'block':'none';
+    var base=location.origin+location.pathname.replace(/\/order\/?$/,'');
+    $('#qrLinks').innerHTML=SEATS.map(function(s){
+      var url=base+'?order=1&seat='+encodeURIComponent(s);
+      return '<div class="qr-link"><b>'+s+'</b><br><a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a></div>';
+    }).join('');
+  };
   function showModal(html,after){$('#modal').innerHTML=html;$('#modalBackdrop').classList.add('show');$$('[data-close]').forEach(function(b){b.onclick=closeModal});if(after)after()} function closeModal(){$('#modalBackdrop').classList.remove('show')} $('#modalBackdrop').onclick=function(e){if(e.target===$('#modalBackdrop'))closeModal()};
   function renderAll(){renderDashboard();renderOrders();renderAnalytics();renderInventory();renderReserves();renderSeats()}
   renderAll();
   detectBackend();
   function syncRoute(){
-    if(location.hash==='#order'||new URLSearchParams(location.search).has('seat'))page('customer');
+    var route=orderRouteInfo();
+    if(route.order){
+      if(route.seat&&SEATS.indexOf(route.seat)>=0){
+        customerSeat=route.seat;
+        save('ippukuCustomerSeat',customerSeat);
+      }
+      page('customer');
+      return;
+    }
   }
   window.addEventListener('hashchange',syncRoute);
+  window.addEventListener('popstate',syncRoute);
   syncRoute();
 })();
