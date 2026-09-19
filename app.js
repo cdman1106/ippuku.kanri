@@ -341,6 +341,13 @@
     var result=await apiRequest('/api/health');
     backendChecked=true;
     backendReady=!!(result.ok&&result.data&&result.data.database);
+
+    // /api/health だけが失敗しても注文APIが生きている場合は接続済みとして扱う。
+    if(!backendReady){
+      var probe=await apiRequest('/api/orders?limit=1');
+      backendReady=!!(probe.ok&&probe.data&&Array.isArray(probe.data.orders));
+    }
+
     if(backendReady){
       await loadSeatAccess();
       await syncSharedStates();
@@ -1181,13 +1188,13 @@
           if(!backendReady){
             await detectBackend();
           }
-          if(!backendReady){
-            throw new Error('BACKEND_OFFLINE');
-          }
           var result=await apiRequest('/api/orders',{
             method:'POST',
             body:JSON.stringify(payload)
           });
+          if(result.status===0){
+            throw new Error('BACKEND_OFFLINE');
+          }
           if(result.status===409&&result.data&&result.data.error==='DRINK_REQUIRED'){
             throw new Error('DRINK_REQUIRED');
           }
