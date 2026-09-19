@@ -25,7 +25,7 @@ main{max-width:1440px;margin:auto;padding:24px 24px 108px}.page{display:none}.pa
  main{padding:16px 12px 110px}.topbar{padding:14px 12px}.topbar h1{font-size:17px}.hero-grid,.quick-grid{grid-template-columns:1fr 1fr}.two-col,.analytics-grid,.settings-grid{grid-template-columns:1fr}.seat-layout-wrap{grid-template-columns:1fr}.floorplan{min-height:640px}.seat-detail{min-height:250px}.nav-item{min-width:49px;padding:8px 5px}.nav-item small{font-size:9px}.nav-item span{font-size:16px}.ghost{padding:8px 10px;font-size:12px}.metric{min-height:112px;padding:16px}.metric strong{font-size:23px}.section-head{align-items:flex-start;flex-direction:column}.legend{margin-top:-6px}.order-card{grid-template-columns:66px 1fr auto;gap:10px}.qr-links{grid-template-columns:1fr}
 }
 @media(max-width:560px){
- .floorplan{min-height:580px}.seat{width:50px;height:50px;font-size:9px}.t1{width:120px;height:175px}.t2{width:102px;height:128px}.t3{width:120px;height:128px}.hero-grid{gap:8px}.metric{border-radius:14px;padding:13px}.metric strong{font-size:19px}.metric span,.metric small{font-size:10px}.quick-grid{gap:8px}.quick strong{font-size:17px}.menu-grid{grid-template-columns:1fr 1fr;gap:8px}.menu-card{padding:13px}#openCustomer{display:none}.top-actions .sound-enable{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 10px;font-size:11px;white-space:nowrap}.inventory-card,.reserve-card{grid-template-columns:1fr auto}
+ .floorplan{min-height:580px}.seat{width:50px;height:50px;font-size:9px}.t1{width:120px;height:175px}.t2{width:102px;height:128px}.t3{width:120px;height:128px}.hero-grid{gap:8px}.metric{border-radius:14px;padding:13px}.metric strong{font-size:19px}.metric span,.metric small{font-size:10px}.quick-grid{gap:8px}.quick strong{font-size:17px}.menu-grid{grid-template-columns:1fr 1fr;gap:8px}.menu-card{padding:13px}#openCustomer{display:inline-flex!important;align-items:center;justify-content:center;min-height:42px;padding:8px 10px;white-space:nowrap}.top-actions .sound-enable{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 10px;font-size:11px;white-space:nowrap}.inventory-card,.reserve-card{grid-template-columns:1fr auto}
 }
 
 .strategy-panel{background:linear-gradient(145deg,#241c14,#18140f);border:1px solid #5b4326;border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
@@ -712,4 +712,19 @@ body.customer-mode .checkout-totals + .form-row{margin-top:18px}
   outline-offset:2px;
   border-color:#caa76d!important;
   background:#fffdf8;
+}
+
+
+/* Keep customer order entry visible on mobile */
+@media(max-width:560px){
+  body:not(.customer-mode) #openCustomer{
+    display:inline-flex!important;
+    align-items:center;
+    justify-content:center;
+    min-height:42px;
+    padding:8px 10px;
+    white-space:nowrap;
+    visibility:visible!important;
+    opacity:1!important;
+  }
 }
