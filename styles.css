@@ -649,3 +649,22 @@ body.customer-mode .detail-total strong{
   color:#221b16;
 }
 body.customer-mode .checkout-totals + .form-row{margin-top:18px}
+
+
+/* Inventory LINE modal white fix */
+.line-copy-text{
+  background:#fff!important;
+  color:#2a241f!important;
+  border:1px solid #d9d2cb!important;
+  box-shadow:inset 0 1px 2px rgba(45,35,27,.04);
+  caret-color:#2a241f;
+}
+.line-copy-text:focus{
+  outline:2px solid #d7b477;
+  outline-offset:1px;
+  border-color:#caa76d!important;
+}
+#inventoryLineText::selection{
+  background:#ead8b8;
+  color:#201a16;
+}
