@@ -697,15 +697,29 @@
         return '<div class="inventory-card">'+
           '<div class="inventory-main"><div class="inventory-card-title"><b>'+esc(x.name)+'</b><span class="inventory-shop-badge">'+esc(inventoryShopLabel(x))+'</span></div>'+
           '<small data-stock-meta="'+i+'" data-stock-base="'+esc(meta)+'">'+meta+(low?' ・ 買出し必要':'')+'</small></div>'+
-          '<input class="stock-input" type="number" step="0.01" placeholder="現在庫" inputmode="decimal" value="'+(hasStock?stock:'')+'" data-stock="'+i+'">'+
+          '<input class="stock-input" type="number" step="0.01" placeholder="現在庫" inputmode="decimal" value="'+(hasStock?stock:'')+'" data-stock="'+i+'" autocomplete="off">'+
           '<span class="status '+(!hasStock?'waiting':(low?'waiting':'ok'))+'" data-stock-status="'+i+'">'+(!hasStock?'未入力':stock+esc(x.unit))+'</span>'+
-          '<button class="inventory-edit-btn" data-edit-inventory="'+i+'">編集</button>'+
+          '<button class="inventory-edit-btn" type="button" tabindex="-1" data-edit-inventory="'+i+'">編集</button>'+
         '</div>';
       }).join('');
       return '<section class="inventory-section"><div class="inventory-section-head"><h3>'+esc(section)+'</h3><span>'+groups[section].length+'品</span></div>'+cards+'</section>';
     }).join('')+'</div>';
 
-    $$('[data-stock]').forEach(function(inp){
+    var stockInputs=$('[data-stock]');
+    stockInputs.forEach(function(inp,pos){
+      inp.onfocus=function(){
+        // PC入力時は現在値を全選択。数字を打つだけで置き換えられる。
+        try{inp.select()}catch(e){}
+      };
+      inp.onkeydown=function(e){
+        // Enterでも次の在庫数欄へ。Tab/Shift+Tabはブラウザ標準で前後の在庫欄へ移動。
+        if(e.key==='Enter'){
+          e.preventDefault();
+          inp.blur();
+          var next=stockInputs[pos+1];
+          if(next){next.focus();try{next.select()}catch(err){}}
+        }
+      };
       inp.onchange=function(){
         var index=Number(inp.dataset.stock);
         var item=inventory[index];
