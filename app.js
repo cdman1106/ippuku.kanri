@@ -439,7 +439,7 @@
       var now=new Date();
       var jstNow=new Date(now.getTime()+9*60*60*1000);
       var y=jstNow.getUTCFullYear(),m=jstNow.getUTCMonth(),d=jstNow.getUTCDate(),h=jstNow.getUTCHours();
-      var businessStart=new Date(Date.UTC(y,m,h<3?d-1:d,3,0,0));
+      var businessStart=new Date(Date.UTC(y,m,h<12?d-1:d,3,0,0));
       if(updated.getTime()<businessStart.getTime())serverOpen=true;
     }
     customerSeatOpen=serverOpen;
@@ -1235,7 +1235,9 @@
           }else if(e&&e.message==='BACKEND_OFFLINE'){
             alert('現在、注文サーバーに接続できません。注文は送信されていません。スタッフへお声がけください。');
           }else{
-            alert('注文を送信できませんでした。注文は確定していません。スタッフへお声がけください。');
+            var serverError=(result&&result.data&&result.data.error)?String(result.data.error):'UNKNOWN';
+            console.error('order server response',result);
+            alert('注文を送信できませんでした。注文は確定していません。\nエラー: '+serverError);
           }
         }
       };
