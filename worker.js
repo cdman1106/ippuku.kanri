@@ -351,6 +351,22 @@ export default {
         return json({ ok: false, error: "SERVER_ERROR" }, 500);
       }
     }
-    return env.ASSETS.fetch(request);
+    const assetResponse = await env.ASSETS.fetch(request);
+    const headers = new Headers(assetResponse.headers);
+    if (
+      url.pathname === "/" ||
+      url.pathname.endsWith(".html") ||
+      url.pathname.endsWith(".js") ||
+      url.pathname.endsWith(".css")
+    ) {
+      headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      headers.set("Pragma", "no-cache");
+      headers.set("Expires", "0");
+    }
+    return new Response(assetResponse.body, {
+      status: assetResponse.status,
+      statusText: assetResponse.statusText,
+      headers
+    });
   }
 };
