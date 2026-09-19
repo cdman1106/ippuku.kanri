@@ -234,7 +234,7 @@
   }
 
 
-  var backendReady=false, backendChecked=false, serverOrdersInitialized=false, serverSeenIds=new Set(), serverSyncTimer=null;
+  var backendReady=false, backendChecked=false, serverOrdersInitialized=false, serverSeenIds=new Set(), serverSyncTimer=null, sharedStateTimer=null;
 
   async function apiRequest(path,options){
     try{
@@ -248,35 +248,72 @@
     }
   }
 
-  async function pushSalesState(){
+  async function pushSharedState(key,value){
     if(!backendReady)return false;
-    var result=await apiRequest('/api/state/sales',{
+    var result=await apiRequest('/api/state/'+encodeURIComponent(key),{
       method:'PUT',
-      body:JSON.stringify({value:sales})
+      body:JSON.stringify({value:value})
     });
     return !!result.ok;
   }
 
-  async function syncSalesState(){
-    if(!backendReady)return;
-    var result=await apiRequest('/api/state/sales');
-    if(!result.ok||!result.data)return;
-
-    if(result.data.exists&&Array.isArray(result.data.value)&&result.data.value.length){
-      sales=result.data.value;
+  function applySharedState(key,value){
+    if(!Array.isArray(value))return;
+    if(key==='sales'){
+      sales=value;
       save('ippukuSales',sales);
       renderDashboard();
       renderAnalytics();
+    }else if(key==='inventory'){
+      inventory=value;
+      save('ippukuInventory',inventory);
+      renderInventory();
+    }else if(key==='reserves'){
+      reserves=value;
+      save('ippukuReserves',reserves);
+      renderReserves();
+      renderDashboard();
+    }else if(key==='promos'){
+      promos=value;
+      save('ippukuPromos',promos);
+      if(document.body.classList.contains('customer-mode'))renderCustomerPromos();
+    }
+  }
+
+  function localSharedState(key){
+    if(key==='sales')return sales;
+    if(key==='inventory')return inventory;
+    if(key==='reserves')return reserves;
+    if(key==='promos')return promos;
+    return [];
+  }
+
+  async function syncSharedStateKey(key){
+    if(!backendReady)return;
+    var result=await apiRequest('/api/state/'+encodeURIComponent(key));
+    if(!result.ok||!result.data)return;
+
+    if(result.data.exists&&Array.isArray(result.data.value)){
+      applySharedState(key,result.data.value);
       return;
     }
 
-    // Safariしか使えない場合でも、この端末に残っている売上データを
-    // 初回だけ共有データとしてD1へ自動保存する。
-    if(Array.isArray(sales)&&sales.length){
-      await pushSalesState();
-      renderDashboard();
-      renderAnalytics();
+    var localValue=localSharedState(key);
+    if(Array.isArray(localValue)&&localValue.length){
+      await pushSharedState(key,localValue);
     }
+  }
+
+  async function syncSharedStates(){
+    if(!backendReady)return;
+    await syncSharedStateKey('sales');
+    await syncSharedStateKey('inventory');
+    await syncSharedStateKey('reserves');
+    await syncSharedStateKey('promos');
+  }
+
+  async function pushSalesState(){
+    return pushSharedState('sales',sales);
   }
 
   async function syncOrdersFromServer(initial){
@@ -307,9 +344,10 @@
     backendReady=!!(result.ok&&result.data&&result.data.database);
     if(backendReady){
       await loadSeatAccess();
-      await syncSalesState();
+      await syncSharedStates();
       await syncOrdersFromServer(true);
       if(!serverSyncTimer)serverSyncTimer=setInterval(function(){syncOrdersFromServer(false)},2000);
+      if(!sharedStateTimer)sharedStateTimer=setInterval(function(){syncSharedStates()},10000);
       if(document.body.classList.contains('customer-mode'))startCustomerSeatWatch();
     }
     return backendReady;
@@ -422,7 +460,7 @@
     $('#bottomNav').style.display=name==='customer'?'none':'flex'; $('.topbar').style.display=name==='customer'?'none':'flex'; document.body.classList.toggle('customer-mode',name==='customer');
     var t={dashboard:'店舗ダッシュボード',seats:'座席・注文管理',orders:'注文一覧',analytics:'売上分析',inventory:'在庫・発注',reserve:'取り置き管理',settings:'設定'};
     if(t[name]) $('#pageTitle').textContent=t[name];
-    if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory') renderInventory(); if(name==='reserve') renderReserves(); if(name==='customer'){renderCustomer();startCustomerSeatWatch()}else{stopCustomerSeatWatch()}
+    if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory'){renderInventory();if(backendReady)syncSharedStateKey('inventory')} if(name==='reserve'){renderReserves();if(backendReady)syncSharedStateKey('reserves')} if(name==='customer'){renderCustomer();if(backendReady)syncSharedStateKey('promos');startCustomerSeatWatch()}else{stopCustomerSeatWatch()}
     window.scrollTo(0,0);
   }
   $$('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){if(location.hash!=='#order')location.hash='order';page('customer')}; $('#refreshBtn').onclick=renderAll;
@@ -700,6 +738,7 @@
         var v=inp.value.trim();
         item.stock=v===''?'':Number(v);
         save('ippukuInventory',inventory);
+        if(backendReady)pushSharedState('inventory',inventory);
 
         var hasStock=item.stock!==''&&item.stock!==null&&item.stock!==undefined&&!isNaN(Number(item.stock));
         var stock=hasStock?Number(item.stock):null;
@@ -759,6 +798,7 @@
           if(!isNew&&x.note)item.note=x.note;
           if(isNew)inventory.push(item);else inventory[index]=item;
           save('ippukuInventory',inventory);
+          if(backendReady)pushSharedState('inventory',inventory);
           closeModal();renderInventory();
         };
         var del=$('#deleteInventoryItem');
@@ -766,6 +806,7 @@
           if(!confirm('この在庫商品を削除しますか？'))return;
           inventory.splice(index,1);
           save('ippukuInventory',inventory);
+          if(backendReady)pushSharedState('inventory',inventory);
           closeModal();renderInventory();
         };
       }
@@ -862,8 +903,8 @@
   var addInventoryBtn=$('#addInventoryBtn');
   if(addInventoryBtn)addInventoryBtn.onclick=function(){openInventoryEditor(-1)};
 
-  function renderReserves(){$('#reserveList').innerHTML=reserves.length?reserves.map(function(r,i){return '<div class="reserve-card"><div><b>'+esc(r.item)+' ×'+r.qty+'</b><small>'+esc(r.name||'お客様')+' / 来店 '+esc(r.date)+' '+esc(r.time||'')+'</small></div><span class="status waiting">'+esc(r.date)+'</span><button class="ghost" data-del-res="'+i+'">完了</button></div>'}).join(''):'<div class="panel note">取り置きはありません。</div>';$$('[data-del-res]').forEach(function(b){b.onclick=function(){reserves.splice(Number(b.dataset.delRes),1);save('ippukuReserves',reserves);renderAll()}})}
-  $('#addReserveBtn').onclick=function(){showModal('<h3>取り置き追加</h3><div class="form-row"><label>お客様名</label><input id="resName"></div><div class="form-row"><label>商品・銘柄</label><input id="resItem"></div><div class="form-row"><label>個数</label><input id="resQty" type="number" value="1"></div><div class="form-row"><label>来店日</label><input id="resDate" type="date"></div><div class="form-row"><label>時間</label><input id="resTime" type="time"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="saveRes">追加</button></div>',function(){$('#saveRes').onclick=function(){reserves.push({name:$('#resName').value,item:$('#resItem').value||'未設定',qty:Number($('#resQty').value)||1,date:$('#resDate').value,time:$('#resTime').value});save('ippukuReserves',reserves);closeModal();renderAll()}})};
+  function renderReserves(){$('#reserveList').innerHTML=reserves.length?reserves.map(function(r,i){return '<div class="reserve-card"><div><b>'+esc(r.item)+' ×'+r.qty+'</b><small>'+esc(r.name||'お客様')+' / 来店 '+esc(r.date)+' '+esc(r.time||'')+'</small></div><span class="status waiting">'+esc(r.date)+'</span><button class="ghost" data-del-res="'+i+'">完了</button></div>'}).join(''):'<div class="panel note">取り置きはありません。</div>';$$('[data-del-res]').forEach(function(b){b.onclick=function(){reserves.splice(Number(b.dataset.delRes),1);save('ippukuReserves',reserves);if(backendReady)pushSharedState('reserves',reserves);renderAll()}})}
+  $('#addReserveBtn').onclick=function(){showModal('<h3>取り置き追加</h3><div class="form-row"><label>お客様名</label><input id="resName"></div><div class="form-row"><label>商品・銘柄</label><input id="resItem"></div><div class="form-row"><label>個数</label><input id="resQty" type="number" value="1"></div><div class="form-row"><label>来店日</label><input id="resDate" type="date"></div><div class="form-row"><label>時間</label><input id="resTime" type="time"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="saveRes">追加</button></div>',function(){$('#saveRes').onclick=function(){reserves.push({name:$('#resName').value,item:$('#resItem').value||'未設定',qty:Number($('#resQty').value)||1,date:$('#resDate').value,time:$('#resTime').value});save('ippukuReserves',reserves);if(backendReady)pushSharedState('reserves',reserves);closeModal();renderAll()}})};
 
 
   function normName(v){return String(v||'').replace(/[・･\s　]/g,'').toLowerCase()}
@@ -908,8 +949,8 @@
       '<div class="promo-manage-list">'+(rows||'<p class="note">POPはまだありません。</p>')+'</div><div class="modal-actions"><button class="ghost" data-close>閉じる</button><button class="primary-btn" id="addPromo">＋ POP追加</button></div>',function(){
         $('#addPromo').onclick=function(){editPromo(-1)};
         $$('[data-edit-promo]').forEach(function(b){b.onclick=function(){editPromo(Number(b.dataset.editPromo))}});
-        $$('[data-del-promo]').forEach(function(b){b.onclick=function(){promos.splice(Number(b.dataset.delPromo),1);save('ippukuPromos',promos);closeModal();renderPromoManager()}});
-        $$('[data-auto-promo]').forEach(function(b){b.onclick=function(){var n=b.dataset.autoPromo;if(!promos.some(function(p){return p.product===n})){var c=defaultPromoCopy(n);promos.push({product:n,tag:c.tag,headline:c.headline,copy:c.copy,active:true});save('ippukuPromos',promos)}closeModal();renderPromoManager()}});
+        $$('[data-del-promo]').forEach(function(b){b.onclick=function(){promos.splice(Number(b.dataset.delPromo),1);save('ippukuPromos',promos);if(backendReady)pushSharedState('promos',promos);closeModal();renderPromoManager()}});
+        $$('[data-auto-promo]').forEach(function(b){b.onclick=function(){var n=b.dataset.autoPromo;if(!promos.some(function(p){return p.product===n})){var c=defaultPromoCopy(n);promos.push({product:n,tag:c.tag,headline:c.headline,copy:c.copy,active:true});save('ippukuPromos',promos);if(backendReady)pushSharedState('promos',promos)}closeModal();renderPromoManager()}});
       });
   }
   function editPromo(index){
@@ -917,7 +958,7 @@
     var c=current||defaultPromoCopy(selected);
     showModal('<h3>'+(index>=0?'POPを編集':'POPを追加')+'</h3><div class="form-row"><label>宣伝する商品</label><select id="promoProduct">'+menu.map(function(m){return '<option '+(m.name===selected?'selected':'')+'>'+esc(m.name)+'</option>'}).join('')+'</select></div><div class="form-row"><label>小見出し</label><input id="promoTag" value="'+esc(c.tag||'')+'" placeholder="例：スタッフおすすめ"></div><div class="form-row"><label>大きな見出し</label><input id="promoHeadline" value="'+esc(c.headline||'')+'" placeholder="例：まずは、ほっと一杯。"></div><div class="form-row"><label>宣伝文</label><input id="promoCopy" value="'+esc(c.copy||'')+'" placeholder="商品の魅力を短く"></div><div class="modal-actions"><button class="ghost" data-close>取消</button><button class="primary-btn" id="savePromo">保存</button></div>',function(){
       $('#promoProduct').onchange=function(){var d=defaultPromoCopy(this.value);$('#promoTag').value=d.tag;$('#promoHeadline').value=d.headline;$('#promoCopy').value=d.copy};
-      $('#savePromo').onclick=function(){var p={product:$('#promoProduct').value,tag:$('#promoTag').value||'おすすめ',headline:$('#promoHeadline').value||$('#promoProduct').value,copy:$('#promoCopy').value||'ぜひ一度お試しください。',active:true};if(index>=0)promos[index]=p;else promos.push(p);save('ippukuPromos',promos);closeModal();};
+      $('#savePromo').onclick=function(){var p={product:$('#promoProduct').value,tag:$('#promoTag').value||'おすすめ',headline:$('#promoHeadline').value||$('#promoProduct').value,copy:$('#promoCopy').value||'ぜひ一度お試しください。',active:true};if(index>=0)promos[index]=p;else promos.push(p);save('ippukuPromos',promos);if(backendReady)pushSharedState('promos',promos);closeModal();};
     });
   }
 
