@@ -237,7 +237,9 @@
     save('ippukuOrders',orders);
     serverSeenIds=new Set(incoming.map(function(o){return String(o.id)}));
     serverOrdersInitialized=true;
-    renderAll();
+    renderDashboard();
+    renderOrders();
+    renderSeats();
     if(fresh.length){
       fresh.sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});
       startOrderAlarm(fresh[0]);
@@ -626,9 +628,9 @@
         var meta=(x.source?esc(x.source)+' / ':'')+'基準 '+x.min+esc(x.unit)+(x.note?' / '+esc(x.note):'');
         return '<div class="inventory-card">'+
           '<div class="inventory-main"><div class="inventory-card-title"><b>'+esc(x.name)+'</b><span class="inventory-shop-badge">'+esc(shop)+'</span></div>'+
-          '<small>'+meta+(low?' ・ 補充/買出し推奨':'')+'</small></div>'+
+          '<small data-stock-meta="'+i+'" data-stock-base="'+esc(meta)+'">'+meta+(low?' ・ 補充/買出し推奨':'')+'</small></div>'+
           '<input class="stock-input" type="number" step="0.01" placeholder="現在庫" value="'+(hasStock?stock:'')+'" data-stock="'+i+'">'+
-          '<span class="status '+(!hasStock?'waiting':(low?'waiting':'ok'))+'">'+(!hasStock?'未入力':stock+esc(x.unit))+'</span>'+
+          '<span class="status '+(!hasStock?'waiting':(low?'waiting':'ok'))+'" data-stock-status="'+i+'">'+(!hasStock?'未入力':stock+esc(x.unit))+'</span>'+
           '<button class="inventory-edit-btn" data-edit-inventory="'+i+'">編集</button>'+
         '</div>';
       }).join('');
@@ -637,10 +639,26 @@
 
     $$('[data-stock]').forEach(function(inp){
       inp.onchange=function(){
+        var index=Number(inp.dataset.stock);
+        var item=inventory[index];
         var v=inp.value.trim();
-        inventory[Number(inp.dataset.stock)].stock=v===''?'':Number(v);
+        item.stock=v===''?'':Number(v);
         save('ippukuInventory',inventory);
-        renderInventory();
+
+        var hasStock=item.stock!==''&&item.stock!==null&&item.stock!==undefined&&!isNaN(Number(item.stock));
+        var stock=hasStock?Number(item.stock):null;
+        var low=hasStock&&stock<=Number(item.min||0);
+        var status=$('[data-stock-status="'+index+'"]');
+        var metaEl=$('[data-stock-meta="'+index+'"]');
+
+        if(status){
+          status.className='status '+(!hasStock?'waiting':(low?'waiting':'ok'));
+          status.textContent=!hasStock?'未入力':stock+item.unit;
+        }
+        if(metaEl){
+          var base=metaEl.dataset.stockBase||'';
+          metaEl.textContent=base+(low?' ・ 補充/買出し推奨':'');
+        }
       };
     });
     $$('[data-edit-inventory]').forEach(function(b){
@@ -822,7 +840,7 @@
     var ps=activePromos().filter(function(p){return p.product!=='The Cling Lighter ガチャ'});
     box.style.display=ps.length?'block':'none';
     box.innerHTML=ps.length?'<div class="promo-title-row"><div><span class="eyebrow">RECOMMENDED</span><h3>今、いっぷくでおすすめ</h3></div><small>気になったらそのまま追加できます</small></div><div class="promo-scroll">'+ps.map(function(p){var m=promoProduct(p.product);return '<article class="promo-card"><span class="promo-tag">'+esc(p.tag||'おすすめ')+'</span><div class="promo-copy"><h3>'+esc(p.headline||p.product)+'</h3><p>'+esc(p.copy||'ぜひ一度お試しください。')+'</p></div><div class="promo-product"><div><b>'+esc(p.product)+'</b><strong>'+yen(m?m.price:0)+'</strong></div><button class="promo-add" data-promo-add="'+esc(p.product)+'">これを注文 ＋</button></div></article>'}).join('')+'</div>':'';
-    $('[data-promo-add]').forEach(function(b){b.onclick=function(){var m=promoProduct(b.dataset.promoAdd);if(!m)return;addMenuItem(m,function(){b.textContent='追加しました ✓';setTimeout(function(){b.textContent='これを注文 ＋'},900)})}});
+    $$('[data-promo-add]').forEach(function(b){b.onclick=function(){var m=promoProduct(b.dataset.promoAdd);if(!m)return;addMenuItem(m,function(){b.textContent='追加しました ✓';setTimeout(function(){b.textContent='これを注文 ＋'},900)})}});
     refreshCustomerSeatAccess(false);
   }
   function renderPromoManager(){
