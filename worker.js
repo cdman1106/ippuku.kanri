@@ -78,6 +78,13 @@ async function ensureOrdersTables(env) {
   await addColumnIfMissing(env, "orders", ordersCols, "note", "note TEXT NOT NULL DEFAULT ''");
   await addColumnIfMissing(env, "orders", ordersCols, "created_at", "created_at TEXT NOT NULL DEFAULT ''");
   await addColumnIfMissing(env, "orders", ordersCols, "updated_at", "updated_at TEXT NOT NULL DEFAULT ''");
+  // Existing orders must never be picked up automatically after this deployment.
+  // Only orders created after bridge support is deployed are explicitly marked pending.
+  await addColumnIfMissing(env, "orders", ordersCols, "bridge_status", "bridge_status TEXT NOT NULL DEFAULT 'legacy'");
+  await addColumnIfMissing(env, "orders", ordersCols, "bridge_device", "bridge_device TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing(env, "orders", ordersCols, "bridge_claimed_at", "bridge_claimed_at TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing(env, "orders", ordersCols, "bridge_completed_at", "bridge_completed_at TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing(env, "orders", ordersCols, "bridge_error", "bridge_error TEXT NOT NULL DEFAULT ''");
 
   const itemCols = await tableColumns(env, "order_items");
   await addColumnIfMissing(env, "order_items", itemCols, "display_name", "display_name TEXT NOT NULL DEFAULT ''");
@@ -89,6 +96,11 @@ async function ensureOrdersTables(env) {
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_bridge_status ON orders(bridge_status, created_at)").run();
+
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS air_product_map (name TEXT NOT NULL, option_text TEXT NOT NULL DEFAULT '', air_code TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (name, option_text))"
+  ).run();
 }
 
 async function hasDrinkForSeatSession(env, seat, since) {
@@ -238,7 +250,7 @@ async function setSeatAccess(request, env, seat) {
 async function getOrder(env, id) {
   await ensureOrdersTables(env);
   const row = await env.DB.prepare(
-    "SELECT id, seat, status, total, note, created_at, updated_at FROM orders WHERE id = ?"
+    "SELECT id, seat, status, total, note, created_at, updated_at, bridge_status, bridge_device, bridge_claimed_at, bridge_completed_at, bridge_error FROM orders WHERE id = ?"
   ).bind(id).first();
   if (!row) return null;
 
@@ -254,6 +266,11 @@ async function getOrder(env, id) {
     note: row.note || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    bridgeStatus: row.bridge_status || "legacy",
+    bridgeDevice: row.bridge_device || "",
+    bridgeClaimedAt: row.bridge_claimed_at || "",
+    bridgeCompletedAt: row.bridge_completed_at || "",
+    bridgeError: row.bridge_error || "",
     items: (itemResult.results || []).map((x) => ({
       name: x.name,
       displayName: x.display_name || x.name,
@@ -375,7 +392,7 @@ async function createOrder(request, env) {
 
   try {
     await env.DB.prepare(
-      "INSERT INTO orders (id, seat, status, total, note, created_at, updated_at) VALUES (?, ?, 'ordered', ?, ?, ?, ?)"
+      "INSERT INTO orders (id, seat, status, total, note, created_at, updated_at, bridge_status) VALUES (?, ?, 'ordered', ?, ?, ?, ?, 'pending')"
     ).bind(id, seat, total, note, now, now).run();
 
     const itemStatements = items.map((item) =>
@@ -427,6 +444,178 @@ async function deleteOrder(env, id) {
   return json({ ok: true });
 }
 
+async function resolveAirCode(env, name, optionText) {
+  const exact = await env.DB.prepare(
+    "SELECT air_code FROM air_product_map WHERE name = ? AND option_text = ?"
+  ).bind(name, optionText || "").first();
+  if (exact?.air_code) return String(exact.air_code);
+
+  if (optionText) {
+    const fallback = await env.DB.prepare(
+      "SELECT air_code FROM air_product_map WHERE name = ? AND option_text = ''"
+    ).bind(name).first();
+    if (fallback?.air_code) return String(fallback.air_code);
+  }
+  return "";
+}
+
+async function listAirMappings(env) {
+  await ensureOrdersTables(env);
+  const result = await env.DB.prepare(
+    "SELECT name, option_text, air_code, updated_at FROM air_product_map ORDER BY name ASC, option_text ASC"
+  ).all();
+  return json({
+    ok: true,
+    mappings: (result.results || []).map((x) => ({
+      name: x.name,
+      option: x.option_text || "",
+      airCode: x.air_code,
+      updatedAt: x.updated_at
+    }))
+  });
+}
+
+async function upsertAirMapping(request, env) {
+  await ensureOrdersTables(env);
+  const body = await request.json().catch(() => null);
+  const name = String(body?.name || "").trim().slice(0, 120);
+  const optionText = String(body?.option || "").trim().slice(0, 240);
+  const airCode = String(body?.airCode || "").trim().slice(0, 64);
+  if (!name || !/^[0-9]+$/.test(airCode)) {
+    return json({ ok: false, error: "INVALID_MAPPING" }, 400);
+  }
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO air_product_map (name, option_text, air_code, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(name, option_text) DO UPDATE SET air_code = excluded.air_code, updated_at = excluded.updated_at"
+  ).bind(name, optionText, airCode, now).run();
+  return json({ ok: true, name, option: optionText, airCode, updatedAt: now });
+}
+
+async function claimBridgeOrder(request, env) {
+  await ensureOrdersTables(env);
+  const body = await request.json().catch(() => ({}));
+  const device = String(body?.device || "galaxy").trim().slice(0, 80) || "galaxy";
+  const since = currentBusinessDayStartIso();
+
+  // Strict FIFO. Do not skip an older pending order because that would change table order.
+  const row = await env.DB.prepare(
+    "SELECT id FROM orders WHERE status = 'ordered' AND bridge_status = 'pending' AND created_at >= ? ORDER BY created_at ASC LIMIT 1"
+  ).bind(since).first();
+
+  if (!row) return json({ ok: true, order: null });
+
+  const order = await getOrder(env, row.id);
+  if (!order) return json({ ok: true, order: null });
+
+  const expanded = [];
+  const missingMappings = [];
+  for (const item of order.items || []) {
+    const code = await resolveAirCode(env, item.name, item.option || "");
+    if (!code) {
+      missingMappings.push({
+        name: item.name,
+        option: item.option || "",
+        displayName: item.displayName || item.name
+      });
+      continue;
+    }
+    for (let i = 0; i < Math.max(1, Number(item.qty || 1)); i++) {
+      expanded.push({
+        name: item.name,
+        displayName: item.displayName || item.name,
+        option: item.option || "",
+        airCode: code
+      });
+    }
+  }
+
+  if (missingMappings.length) {
+    return json({
+      ok: true,
+      blocked: true,
+      reason: "MAPPING_REQUIRED",
+      orderId: order.id,
+      seat: order.seat,
+      missingMappings
+    });
+  }
+
+  // We have only verified the exact Airレジ focus path for one product.
+  // Refuse multi-item/qty>1 instead of creating an incorrect slip.
+  if (expanded.length !== 1) {
+    return json({
+      ok: true,
+      blocked: true,
+      reason: "MULTI_ITEM_NOT_VERIFIED",
+      orderId: order.id,
+      seat: order.seat,
+      itemCount: expanded.length
+    });
+  }
+
+  const now = new Date().toISOString();
+  const claimed = await env.DB.prepare(
+    "UPDATE orders SET bridge_status = 'processing', bridge_device = ?, bridge_claimed_at = ?, bridge_error = '', updated_at = ? WHERE id = ? AND bridge_status = 'pending'"
+  ).bind(device, now, now, order.id).run();
+
+  if (!claimed.meta?.changes) return json({ ok: true, order: null });
+
+  return json({
+    ok: true,
+    order: {
+      id: order.id,
+      seat: order.seat,
+      createdAt: order.createdAt,
+      item: expanded[0]
+    }
+  });
+}
+
+async function finishBridgeOrder(request, env, id, success) {
+  await ensureOrdersTables(env);
+  const body = await request.json().catch(() => ({}));
+  const device = String(body?.device || "").trim().slice(0, 80);
+  const error = String(body?.error || "").trim().slice(0, 300);
+  const now = new Date().toISOString();
+
+  let result;
+  if (success) {
+    result = await env.DB.prepare(
+      "UPDATE orders SET bridge_status = 'completed', bridge_completed_at = ?, bridge_error = '', updated_at = ? WHERE id = ? AND bridge_status = 'processing'"
+    ).bind(now, now, id).run();
+  } else {
+    // Error is intentionally terminal. Automatic retry could duplicate an Airレジ slip
+    // if the UI operation succeeded but the acknowledgement failed.
+    result = await env.DB.prepare(
+      "UPDATE orders SET bridge_status = 'error', bridge_error = ?, updated_at = ? WHERE id = ? AND bridge_status = 'processing'"
+    ).bind(error || "UNKNOWN_ERROR", now, id).run();
+  }
+
+  if (!result.meta?.changes) return json({ ok: false, error: "NOT_PROCESSING" }, 409);
+  return json({ ok: true, id, bridgeStatus: success ? "completed" : "error", device });
+}
+
+async function retryBridgeOrder(env, id) {
+  await ensureOrdersTables(env);
+  const now = new Date().toISOString();
+  const result = await env.DB.prepare(
+    "UPDATE orders SET bridge_status = 'pending', bridge_device = '', bridge_claimed_at = '', bridge_completed_at = '', bridge_error = '', updated_at = ? WHERE id = ? AND bridge_status = 'error'"
+  ).bind(now, id).run();
+  if (!result.meta?.changes) return json({ ok: false, error: "NOT_ERROR" }, 409);
+  return json({ ok: true, id, bridgeStatus: "pending" });
+}
+
+async function bridgeStatus(env) {
+  await ensureOrdersTables(env);
+  const since = currentBusinessDayStartIso();
+  const result = await env.DB.prepare(
+    "SELECT bridge_status, COUNT(*) AS count FROM orders WHERE created_at >= ? GROUP BY bridge_status"
+  ).bind(since).all();
+  const counts = {};
+  for (const row of (result.results || [])) counts[row.bridge_status || "legacy"] = Number(row.count || 0);
+  return json({ ok: true, since, counts });
+}
+
 async function handleApi(request, env) {
   if (!env.DB) return json({ ok: false, error: "D1_NOT_BOUND" }, 503);
 
@@ -463,6 +652,28 @@ async function handleApi(request, env) {
   }
   if (seatMatch && request.method === "PATCH") {
     return setSeatAccess(request, env, decodeURIComponent(seatMatch[1]));
+  }
+
+  if (url.pathname === "/api/bridge/status" && request.method === "GET") {
+    return bridgeStatus(env);
+  }
+  if (url.pathname === "/api/bridge/mappings" && request.method === "GET") {
+    return listAirMappings(env);
+  }
+  if (url.pathname === "/api/bridge/mappings" && request.method === "PUT") {
+    return upsertAirMapping(request, env);
+  }
+  if (url.pathname === "/api/bridge/claim" && request.method === "POST") {
+    return claimBridgeOrder(request, env);
+  }
+
+  const bridgeOrderMatch = url.pathname.match(/^\/api\/bridge\/orders\/([^/]+)\/(complete|error|retry)$/);
+  if (bridgeOrderMatch) {
+    const id = decodeURIComponent(bridgeOrderMatch[1]);
+    const action = bridgeOrderMatch[2];
+    if (action === "complete" && request.method === "POST") return finishBridgeOrder(request, env, id, true);
+    if (action === "error" && request.method === "POST") return finishBridgeOrder(request, env, id, false);
+    if (action === "retry" && request.method === "POST") return retryBridgeOrder(env, id);
   }
 
   if (url.pathname === "/api/orders" && request.method === "GET") {
