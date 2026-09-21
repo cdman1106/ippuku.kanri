@@ -578,7 +578,6 @@ async function claimBridgeOrder(request, env) {
   await ensureOrdersTables(env);
   const body = await request.json().catch(() => ({}));
   const device = String(body?.device || "galaxy").trim().slice(0, 80) || "galaxy";
-  const multiItemLearned = body?.multiItemLearned === true;
   const since = currentBusinessDayStartIso();
 
   // Strict FIFO. Do not skip an older pending order because that would change table order.
@@ -624,25 +623,13 @@ async function claimBridgeOrder(request, env) {
     });
   }
 
-  // 複数商品は、Galaxy側に実機で学習した2商品テンプレートがある時だけ許可する。
-  // 学習なしでclaimしないことで、誤操作した注文をprocessingにしない。
-  if (expanded.length > 1 && !multiItemLearned) {
+  // We have only verified the exact Airレジ focus path for one product.
+  // Refuse multi-item/qty>1 instead of creating an incorrect slip.
+  if (expanded.length !== 1) {
     return json({
       ok: true,
       blocked: true,
-      reason: "MULTI_ITEM_TEMPLATE_REQUIRED",
-      orderId: order.id,
-      seat: order.seat,
-      itemCount: expanded.length
-    });
-  }
-
-  // 1伝票で極端に多いキー操作を自動実行しない安全上限。
-  if (expanded.length > 20) {
-    return json({
-      ok: true,
-      blocked: true,
-      reason: "TOO_MANY_ITEMS",
+      reason: "MULTI_ITEM_NOT_VERIFIED",
       orderId: order.id,
       seat: order.seat,
       itemCount: expanded.length
@@ -662,9 +649,6 @@ async function claimBridgeOrder(request, env) {
       id: order.id,
       seat: order.seat,
       createdAt: order.createdAt,
-      itemCount: expanded.length,
-      items: expanded,
-      // 旧Androidとの互換用。新Androidはitemsを使用。
       item: expanded[0]
     }
   });
@@ -712,7 +696,7 @@ async function bridgeStatus(env) {
   ).bind(since).all();
   const counts = {};
   for (const row of (result.results || [])) counts[row.bridge_status || "legacy"] = Number(row.count || 0);
-  return json({ ok: true, since, counts, multiItemLearnedSupported: true });
+  return json({ ok: true, since, counts });
 }
 
 async function handleApi(request, env) {
