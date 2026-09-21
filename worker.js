@@ -7,6 +7,79 @@ const STATUSES = new Set(["ordered","preparing","served","paid"]);
 const DRINK_CATEGORIES = new Set(["Café","Relax","Refresh"]);
 const APP_STATE_KEYS = new Set(["sales","inventory","reserves","promos"]);
 
+// Airレジ商品一括編集CSV（2026-09-21）から、現在のモバイルオーダー掲載商品だけを抽出。
+// バーコード先頭の # はCSV表示用なので、Airレジ検索へ送る値では外す。
+const AIR_BUILTIN_MAP = {
+  "紅茶/アイスティー": {"@HOT":"2000000001128","@ICE":"2000000001135"},
+  "ミルクティー": {"@HOT":"2000000001142","@ICE":"2000000001159"},
+  "抹茶ラテ": {"@HOT":"2000000001180","@ICE":"2000000001197"},
+  "ルイボスティー": {"@HOT":"2000000001371","@ICE":"2000000001388"},
+  "ゆず蜜": {"@SODA":"2000000001272","@HOT_WATER":"2000000001289","@WATER":"2000000001296"},
+
+  "コーヒー": {"@HOT":"2000000001081","@ICE":"2000000001098"},
+  "カフェラテ": {"@HOT":"2000000001104","@ICE":"2000000001111"},
+  "ウィンナーコーヒー": {"@HOT":"2000000001227","@ICE":"2000000001234"},
+  "キャラメルマキアート": {"@HOT":"2000000001203","@ICE":"2000000001210"},
+  "ホワイトモカ": {"":"2000000001241"},
+  "カフェ・モカ": {"@HOT":"2000000001258","@ICE":"2000000001265"},
+  "チョコチーノ": {"@HOT":"2000000001166","@ICE":"2000000001173"},
+
+  "コーラ": {"":"2000000000237"},
+  "みかんジュース": {"":"2000000000176"},
+  // 青森りんご100%/炭酸 はWeb 650円 / AirレジCSV 660円のため誤請求防止で未登録。
+  "ペリエ": {"":"2000000000183"},
+  "モンスター": {"":"2000000000190"},
+
+  "ポパイサンド": {"":"2000000001357"},
+  "あんバターサンド": {"":"2000000001364"},
+  "チーズケーキ": {"":"2000000001302"},
+  "コーヒーゼリーパフェ": {"":"2000000001395"},
+  // コーヒーゼリー単品はAirレジCSVに商品が無いため未登録。
+  "こんがりワッフル": {"@CHOCO":"2000000001319","@CARAMEL":"2000000001326","@BERRY":"2000000001333"},
+  // ダブルはWeb 730円だがAirレジに専用商品が無いので、シングルだけ自動化。
+  "濃厚バニラアイス": {"@SINGLE":"2000000001340"},
+
+  "ナッツ": {"":"2000000000251"}
+  // ZIPPOガチャ / The Cling Lighter ガチャ はAirレジCSVに検索用バーコードが無いため未登録。
+};
+
+function builtinOptionKey(name, optionText) {
+  const text = String(optionText || "");
+  const upper = text.toUpperCase();
+
+  if ([
+    "紅茶/アイスティー","ミルクティー","抹茶ラテ","ルイボスティー",
+    "コーヒー","カフェラテ","ウィンナーコーヒー",
+    "キャラメルマキアート","カフェ・モカ","チョコチーノ"
+  ].includes(name)) {
+    if (upper.includes("HOT")) return "@HOT";
+    if (upper.includes("ICE")) return "@ICE";
+    return "";
+  }
+
+  if (name === "ゆず蜜") {
+    if (text.includes("炭酸割り")) return "@SODA";
+    if (text.includes("お湯割り")) return "@HOT_WATER";
+    if (text.includes("水割り")) return "@WATER";
+    return "";
+  }
+
+  if (name === "こんがりワッフル") {
+    if (text.includes("チョコ")) return "@CHOCO";
+    if (text.includes("キャラメル")) return "@CARAMEL";
+    if (text.includes("ベリー")) return "@BERRY";
+    return "";
+  }
+
+  if (name === "濃厚バニラアイス") {
+    if (text.includes("シングル")) return "@SINGLE";
+    if (text.includes("ダブル")) return "@DOUBLE";
+    return "";
+  }
+
+  return "";
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -445,16 +518,26 @@ async function deleteOrder(env, id) {
 }
 
 async function resolveAirCode(env, name, optionText) {
+  // 1) 管理APIから明示登録した完全一致を最優先。
   const exact = await env.DB.prepare(
     "SELECT air_code FROM air_product_map WHERE name = ? AND option_text = ?"
   ).bind(name, optionText || "").first();
-  if (exact?.air_code) return String(exact.air_code);
+  if (exact?.air_code) return String(exact.air_code).replace(/^#/, "");
 
+  // 2) CSVから抽出したWeb掲載商品の組み込み対応表。
+  const builtins = AIR_BUILTIN_MAP[name];
+  if (builtins) {
+    const key = builtinOptionKey(name, optionText);
+    if (key && builtins[key]) return builtins[key];
+    if (builtins[""]) return builtins[""];
+  }
+
+  // 3) 手動登録の「オプション共通」設定を最後に使用。
   if (optionText) {
     const fallback = await env.DB.prepare(
       "SELECT air_code FROM air_product_map WHERE name = ? AND option_text = ''"
     ).bind(name).first();
-    if (fallback?.air_code) return String(fallback.air_code);
+    if (fallback?.air_code) return String(fallback.air_code).replace(/^#/, "");
   }
   return "";
 }
