@@ -712,7 +712,7 @@ async function bridgeStatus(env) {
   ).bind(since).all();
   const counts = {};
   for (const row of (result.results || [])) counts[row.bridge_status || "legacy"] = Number(row.count || 0);
-  return json({ ok: true, since, counts });
+  return json({ ok: true, since, counts, multiItemLearnedSupported: true });
 }
 
 async function handleApi(request, env) {
