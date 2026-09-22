@@ -646,7 +646,7 @@ async function recoverBridgeOrder(request, env, id) {
 
   if (action === "retry") {
     const result = await env.DB.prepare(
-      "UPDATE orders SET bridge_status = 'pending', bridge_device = '', bridge_claimed_at = '', bridge_completed_at = '', bridge_error = '', updated_at = ? WHERE id = ? AND bridge_status IN ('processing','error')"
+      "UPDATE orders SET bridge_status = 'pending', bridge_device = '', bridge_claimed_at = '', bridge_completed_at = '', bridge_error = 'MANUAL_RETRY', updated_at = ? WHERE id = ? AND bridge_status IN ('processing','error')"
     ).bind(now, id).run();
     if (!result.meta?.changes) return json({ ok: false, error: "NOT_RECOVERABLE" }, 409);
     return json({ ok: true, id, bridgeStatus: "pending" });
@@ -675,7 +675,7 @@ async function claimBridgeOrder(request, env) {
 
   // 監視開始前の古いpendingは飛ばし、開始後だけをFIFO処理する。
   const row = await env.DB.prepare(
-    "SELECT id FROM orders WHERE status = 'ordered' AND bridge_status = 'pending' AND created_at >= ? ORDER BY created_at ASC LIMIT 1"
+    "SELECT id FROM orders WHERE status = 'ordered' AND bridge_status = 'pending' AND (created_at >= ? OR bridge_error = 'MANUAL_RETRY') ORDER BY CASE WHEN bridge_error = 'MANUAL_RETRY' THEN 0 ELSE 1 END, created_at ASC LIMIT 1"
   ).bind(since).first();
 
   if (!row) return json({ ok: true, order: null });
