@@ -554,6 +554,28 @@ async function createOrder(request, env) {
     }, 409);
   }
 
+  // 本番では、Airレジへ確実に自動入力できない商品を注文確定させない。
+  // これにより未対応商品1件がFIFO先頭で止まり、その後の全注文を塞ぐ事故を防ぐ。
+  const unavailable = [];
+  for (const item of items) {
+    const code = await resolveAirCode(env, item.name, item.option || "");
+    if (!code) {
+      unavailable.push({
+        name: item.name,
+        displayName: item.displayName || item.name,
+        option: item.option || ""
+      });
+    }
+  }
+  if (unavailable.length) {
+    return json({
+      ok: false,
+      error: "AIRREGI_UNAVAILABLE",
+      message: "現在モバイル注文に対応していない商品が含まれています。スタッフへご注文ください。",
+      items: unavailable
+    }, 409);
+  }
+
   const id = crypto.randomUUID();
   const nowDate = new Date();
   const now = nowDate.toISOString();
