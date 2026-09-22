@@ -758,3 +758,58 @@ body.customer-mode .choice-btn.selected{
   font-size:12px;
   font-weight:1000;
 }
+
+
+/* Customer order: force readable light UI on Android/iOS/browser dark mode */
+html{color-scheme:light}
+body.customer-mode{
+  color-scheme:only light!important;
+  background:#fff!important;
+  color:#221b16!important;
+}
+body.customer-mode main,
+body.customer-mode .customer-page,
+body.customer-mode .modal{
+  background-color:#fff!important;
+  color:#221b16!important;
+}
+body.customer-mode button,
+body.customer-mode input,
+body.customer-mode select,
+body.customer-mode textarea{
+  color-scheme:only light!important;
+}
+body.customer-mode input,
+body.customer-mode select,
+body.customer-mode textarea{
+  background-color:#fff!important;
+  color:#221b16!important;
+  -webkit-text-fill-color:#221b16!important;
+  caret-color:#221b16!important;
+}
+body.customer-mode select option{
+  background:#fff!important;
+  color:#221b16!important;
+}
+body.customer-mode input::placeholder,
+body.customer-mode textarea::placeholder{
+  color:#968a80!important;
+  -webkit-text-fill-color:#968a80!important;
+  opacity:1;
+}
+body.customer-mode input:-webkit-autofill,
+body.customer-mode input:-webkit-autofill:hover,
+body.customer-mode input:-webkit-autofill:focus,
+body.customer-mode textarea:-webkit-autofill,
+body.customer-mode select:-webkit-autofill{
+  -webkit-box-shadow:0 0 0 1000px #fff inset!important;
+  -webkit-text-fill-color:#221b16!important;
+  color:#221b16!important;
+}
+body.customer-mode .menu-card-tap,
+body.customer-mode .drink-upsell-card,
+body.customer-mode .checkout-upsell-grid button,
+body.customer-mode .qty-btn,
+body.customer-mode .ghost{
+  -webkit-text-fill-color:currentColor;
+}
