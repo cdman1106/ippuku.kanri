@@ -954,3 +954,287 @@ body:not(.customer-mode) .alarm-stop:active{
     min-height:104px!important;
   }
 }
+
+
+/* ===== 2026-09-22 readability safety net: remove legacy dark surfaces ===== */
+html,body{
+  color-scheme:only light!important;
+  background:#fff!important;
+  color:#241f1b!important;
+}
+button,input,select,textarea{
+  color-scheme:only light!important;
+}
+input,select,textarea{
+  background:#fff!important;
+  color:#241f1b!important;
+  -webkit-text-fill-color:#241f1b!important;
+  caret-color:#241f1b!important;
+}
+input::placeholder,textarea::placeholder{
+  color:#8c8178!important;
+  -webkit-text-fill-color:#8c8178!important;
+  opacity:1!important;
+}
+select option{
+  background:#fff!important;
+  color:#241f1b!important;
+}
+
+/* Main white surfaces */
+.topbar,
+.metric,.quick,.panel,.seat-detail,.order-card,
+.inventory-card,.reserve-card,.setting-card,
+.focus-item,.strategy-panel,.strategy-summary>div,.strategy-card,
+.promo-manage-row,.promo-suggest,.customer-promo,.promo-card,
+.cart-edit-row,.seat-order-history,.seat-order-history.latest-order,
+.seat-access-control,.cling-promo,.cling-price-grid>div,.cling-try-note,
+.inventory-section,.qr-link,.placeholder-panel{
+  background:#fff!important;
+  color:#241f1b!important;
+  border-color:#e4ddd6!important;
+}
+
+/* Navigation */
+.bottom-nav{
+  background:rgba(255,255,255,.98)!important;
+  border-color:#ddd6cf!important;
+}
+.nav-item{
+  color:#675d55!important;
+  -webkit-text-fill-color:#675d55!important;
+}
+.nav-item.active{
+  background:#f0ebe6!important;
+  color:#241f1b!important;
+  -webkit-text-fill-color:#241f1b!important;
+}
+
+/* Seat map */
+.floorplan{
+  background:#fbfaf8!important;
+  border-color:#dcd4cc!important;
+}
+.table-box{
+  background:#f3eee8!important;
+  color:#392f28!important;
+  border-color:#cdbfae!important;
+}
+.table-box small{color:#77695d!important}
+.seat{
+  background:#fff!important;
+  color:#2f2924!important;
+  border-color:#bdb4aa!important;
+  -webkit-text-fill-color:#2f2924!important;
+}
+.seat[data-status="ordered"]{
+  background:#fff1c9!important;
+  border-color:#d3a63f!important;
+  color:#5b4312!important;
+  -webkit-text-fill-color:#5b4312!important;
+}
+.seat[data-status="preparing"]{
+  background:#ffe2dd!important;
+  border-color:#cf6f63!important;
+  color:#742c24!important;
+  -webkit-text-fill-color:#742c24!important;
+}
+.seat[data-status="served"]{
+  background:#def4e5!important;
+  border-color:#65a979!important;
+  color:#235b34!important;
+  -webkit-text-fill-color:#235b34!important;
+}
+.seat[data-status="paid"]{
+  background:#e2edf8!important;
+  border-color:#7199bf!important;
+  color:#284f73!important;
+  -webkit-text-fill-color:#284f73!important;
+}
+.seat[data-status="closed"]{
+  background:#f0efed!important;
+  border-color:#b9b0a8!important;
+  color:#6d645d!important;
+  -webkit-text-fill-color:#6d645d!important;
+  opacity:1!important;
+}
+.seat[data-status="noorder"]{
+  background:#ffe9e5!important;
+  border-color:#c9675c!important;
+  color:#6f2922!important;
+  -webkit-text-fill-color:#6f2922!important;
+}
+.seat[data-status="noorder"] small{color:#8c3c34!important}
+
+/* Filters and ordinary controls */
+.status-btn,.filter,.customer-filter,.inventory-shop-filter,.inventory-edit-btn,
+.qty-btn,.choice-btn,.ghost,.icon-btn{
+  background:#fff!important;
+  color:#3f3731!important;
+  border-color:#d9d1ca!important;
+  -webkit-text-fill-color:#3f3731!important;
+}
+.status-btn.active,.filter.active,.customer-filter.active,.inventory-shop-filter.active{
+  background:#ece6df!important;
+  color:#241f1b!important;
+  border-color:#b9a999!important;
+  -webkit-text-fill-color:#241f1b!important;
+}
+.choice-btn.selected{
+  background:#efe6d9!important;
+  color:#2c241d!important;
+  border-color:#b99a72!important;
+  -webkit-text-fill-color:#2c241d!important;
+}
+.primary-btn,.upload-btn,.promo-add,.cling-order-btn{
+  background:#2f2924!important;
+  color:#fff!important;
+  border-color:#2f2924!important;
+  -webkit-text-fill-color:#fff!important;
+}
+
+/* Status chips use pale backgrounds with dark text */
+.status-chip.ordered,.status.waiting{
+  background:#fff1c9!important;
+  color:#664b12!important;
+}
+.status-chip.preparing{
+  background:#ffe1dc!important;
+  color:#792f27!important;
+}
+.status-chip.served,.status.ok{
+  background:#def4e5!important;
+  color:#245c35!important;
+}
+.status-chip.paid{
+  background:#e2edf8!important;
+  color:#285170!important;
+}
+.status-chip.closed{
+  background:#f6e4e1!important;
+  color:#7c342d!important;
+}
+.tag.focus{
+  background:#e4f3e8!important;
+  color:#2e623e!important;
+}
+.tag.keep{
+  background:#f0ece7!important;
+  color:#5b5148!important;
+}
+.tag.review{
+  background:#f8e6e2!important;
+  color:#794038!important;
+}
+
+/* Notes and alerts: light backgrounds, dark copy */
+.checkout-guide,.night-charge-note,.night-fee-info,
+.seat-running-total,.food-order-note,.one-drink-note,
+.seat-closed-notice,.no-order-alert-list{
+  background:#faf7f2!important;
+  color:#3e352e!important;
+  border-color:#dfd4c8!important;
+}
+.checkout-guide strong,.night-charge-note strong,.one-drink-note strong,
+.seat-running-total strong{
+  color:#664d2d!important;
+}
+.seat-closed-notice{
+  background:#fff2f0!important;
+  color:#6f302a!important;
+  border-color:#e2b1aa!important;
+}
+.no-order-alert-list{
+  background:#fff4f2!important;
+  color:#6f302a!important;
+  border-color:#e0aaa3!important;
+}
+.no-order-alert-seats button{
+  background:#fff!important;
+  color:#71342d!important;
+  border-color:#d8a099!important;
+  -webkit-text-fill-color:#71342d!important;
+}
+
+/* Inventory */
+.inventory-shop-badge{
+  background:#f6efe5!important;
+  color:#654c2d!important;
+  border-color:#d9c6aa!important;
+}
+.line-copy-text{
+  background:#fff!important;
+  color:#241f1b!important;
+  -webkit-text-fill-color:#241f1b!important;
+}
+
+/* Customer/cart/modal surfaces */
+.customer-head,.customer-category-filters,.menu-card,.cart-bar,.modal,
+.drink-upsell-banner,.checkout-upsell,.drink-upsell-card,
+.checkout-upsell-grid button{
+  background:#fff!important;
+  color:#241f1b!important;
+  border-color:#e2dbd4!important;
+}
+.modal-backdrop{
+  background:rgba(73,61,51,.28)!important;
+}
+.menu-card-tap{
+  color:#241f1b!important;
+  -webkit-text-fill-color:#241f1b!important;
+}
+.menu-photo-wrap{background:#f3f0ec!important}
+.add-btn,.drink-upsell-card i,.checkout-upsell-grid i{
+  background:#d8b274!important;
+  color:#2d241b!important;
+  -webkit-text-fill-color:#2d241b!important;
+}
+.cart-remove,.danger-link{
+  color:#9b4f47!important;
+  -webkit-text-fill-color:#9b4f47!important;
+}
+.danger-btn{
+  background:#fff0ee!important;
+  color:#7d302a!important;
+  border-color:#dca9a3!important;
+  -webkit-text-fill-color:#7d302a!important;
+}
+
+/* Make all common text readable even if an old class survives */
+.panel h1,.panel h2,.panel h3,.panel h4,
+.metric strong,.quick strong,.detail-head h3,
+.order-seat,.inventory-card b,.reserve-card b,
+.strategy-card h4,.promo-copy h3,.promo-product b,
+.cart-edit-info b,.seat-order-history b,
+.cling-promo h3,.customer-menu-head h3,.menu-card h3,
+.modal h3{
+  color:#241f1b!important;
+}
+.metric span,.metric small,.quick span,.section-head p,
+.note,.detail-meta,.order-card p,th,.bar-sub,
+.inventory-card small,.reserve-card small,.setting-card p,
+.strategy-card p,.strategy-card li span,.strategy-note,
+.promo-copy p,.promo-manage-row small,.customer-menu-head small,
+.menu-card small,.cart-bar small,.cart-edit-info small,
+.seat-order-history-head small,.seat-history-title span,
+.cling-promo>p,.cling-promo>small,.cling-try-note>small{
+  color:#756b63!important;
+}
+
+/* Native/autofill protection */
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,
+textarea:-webkit-autofill,select:-webkit-autofill{
+  -webkit-box-shadow:0 0 0 1000px #fff inset!important;
+  -webkit-text-fill-color:#241f1b!important;
+}
+
+/* Keep only intentional high-contrast dark actions */
+.alarm-stop{
+  background:#2f2924!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+.alarm-stop *{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
