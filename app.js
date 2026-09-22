@@ -34,6 +34,169 @@
   var initialOrderRoute=orderRouteInfo();
   var selectedSeat='', orderFilter='all', cart=[], customerCategory='all', inventoryShopFilter='all', customerSeat=initialOrderRoute.seat||load('ippukuCustomerSeat','')||'';
   var seatAccess={}, seatAccessMeta={}, customerSeatOpen=true, customerDrinkSatisfied=false, customerSeatTimer=null;
+
+  // Airレジ用バーコード。worker.js / AirBridge と同じ商品コードを使用する。
+  var AIR_BARCODE_MAP={
+    '紅茶/アイスティー':{'@HOT':'2000000001128','@ICE':'2000000001135'},
+    'ミルクティー':{'@HOT':'2000000001142','@ICE':'2000000001159'},
+    '抹茶ラテ':{'@HOT':'2000000001180','@ICE':'2000000001197'},
+    'ルイボスティー':{'@HOT':'2000000001371','@ICE':'2000000001388'},
+    'ゆず蜜':{'@SODA':'2000000001272','@HOT_WATER':'2000000001289','@WATER':'2000000001296'},
+    'コーヒー':{'@HOT':'2000000001081','@ICE':'2000000001098'},
+    'カフェラテ':{'@HOT':'2000000001104','@ICE':'2000000001111'},
+    'ウィンナーコーヒー':{'@HOT':'2000000001227','@ICE':'2000000001234'},
+    'キャラメルマキアート':{'@HOT':'2000000001203','@ICE':'2000000001210'},
+    'ホワイトモカ':{'':'2000000001241'},
+    'カフェ・モカ':{'@HOT':'2000000001258','@ICE':'2000000001265'},
+    'チョコチーノ':{'@HOT':'2000000001166','@ICE':'2000000001173'},
+    'コーラ':{'':'2000000000237'},
+    'みかんジュース':{'':'2000000000176'},
+    'ペリエ':{'':'2000000000183'},
+    'モンスター':{'':'2000000000190'},
+    'ポパイサンド':{'':'2000000001357'},
+    'あんバターサンド':{'':'2000000001364'},
+    'チーズケーキ':{'':'2000000001302'},
+    'コーヒーゼリーパフェ':{'':'2000000001395'},
+    'こんがりワッフル':{'@CHOCO':'2000000001319','@CARAMEL':'2000000001326','@BERRY':'2000000001333'},
+    '濃厚バニラアイス':{'@SINGLE':'2000000001340'},
+    'ナッツ':{'':'2000000000251'}
+  };
+  var airManualMappings={};
+
+  function airMappingKey(name,optionText){
+    return String(name||'')+'|||'+String(optionText||'');
+  }
+
+  function airBuiltinOptionKey(name,optionText){
+    var text=String(optionText||''), upper=text.toUpperCase();
+    if([
+      '紅茶/アイスティー','ミルクティー','抹茶ラテ','ルイボスティー',
+      'コーヒー','カフェラテ','ウィンナーコーヒー',
+      'キャラメルマキアート','カフェ・モカ','チョコチーノ'
+    ].indexOf(name)>=0){
+      if(upper.indexOf('HOT')>=0)return '@HOT';
+      if(upper.indexOf('ICE')>=0)return '@ICE';
+      return '';
+    }
+    if(name==='ゆず蜜'){
+      if(text.indexOf('炭酸割り')>=0)return '@SODA';
+      if(text.indexOf('お湯割り')>=0)return '@HOT_WATER';
+      if(text.indexOf('水割り')>=0)return '@WATER';
+      return '';
+    }
+    if(name==='こんがりワッフル'){
+      if(text.indexOf('チョコ')>=0)return '@CHOCO';
+      if(text.indexOf('キャラメル')>=0)return '@CARAMEL';
+      if(text.indexOf('ベリー')>=0)return '@BERRY';
+      return '';
+    }
+    if(name==='濃厚バニラアイス'){
+      if(text.indexOf('シングル')>=0)return '@SINGLE';
+      if(text.indexOf('ダブル')>=0)return '@DOUBLE';
+      return '';
+    }
+    return '';
+  }
+
+  function resolveAirCodeForItem(item){
+    if(!item||item.category==='Fee')return '';
+    if(item.airCode&&/^\d+$/.test(String(item.airCode)))return String(item.airCode).replace(/^#/,'');
+    var name=String(item.name||''), optionText=String(item.option||'');
+    var exact=airManualMappings[airMappingKey(name,optionText)];
+    if(exact)return exact;
+    var builtins=AIR_BARCODE_MAP[name];
+    if(builtins){
+      var optionKey=airBuiltinOptionKey(name,optionText);
+      if(optionKey&&builtins[optionKey])return builtins[optionKey];
+      if(builtins[''])return builtins[''];
+    }
+    if(optionText){
+      var fallback=airManualMappings[airMappingKey(name,'')];
+      if(fallback)return fallback;
+    }
+    return '';
+  }
+
+  async function loadAirMappings(){
+    if(!backendReady)return;
+    var result=await apiRequest('/api/bridge/mappings');
+    if(!result.ok||!result.data||!Array.isArray(result.data.mappings))return;
+    var next={};
+    result.data.mappings.forEach(function(x){
+      if(!x||!x.name||!/^\d+$/.test(String(x.airCode||'')))return;
+      next[airMappingKey(x.name,x.option||'')]=String(x.airCode).replace(/^#/,'');
+    });
+    airManualMappings=next;
+    if(selectedSeat)renderSeatDetail(selectedSeat);
+  }
+
+  function ean13Bits(code){
+    code=String(code||'');
+    if(!/^\d{13}$/.test(code))return '';
+    var sum=0;
+    for(var n=0;n<12;n++)sum+=Number(code[n])*(n%2===0?1:3);
+    if((10-(sum%10))%10!==Number(code[12]))return '';
+    var L=['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
+    var G=['0100111','0110011','0011011','0100001','0011101','0111001','0000101','0010001','0001001','0010111'];
+    var R=['1110010','1100110','1101100','1000010','1011100','1001110','1010000','1000100','1001000','1110100'];
+    var parity=['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+    var p=parity[Number(code[0])], bits='101';
+    for(var i=1;i<=6;i++)bits+=(p[i-1]==='L'?L:G)[Number(code[i])];
+    bits+='01010';
+    for(var j=7;j<=12;j++)bits+=R[Number(code[j])];
+    return bits+'101';
+  }
+
+  function ean13Svg(code){
+    var bits=ean13Bits(code);
+    if(!bits)return '<div class="air-barcode-invalid">バーコードを生成できません<br><code>'+esc(code)+'</code></div>';
+    var moduleWidth=3, quietModules=12, barHeight=78;
+    var width=(bits.length+quietModules*2)*moduleWidth;
+    var bars='';
+    for(var i=0;i<bits.length;i++){
+      if(bits[i]==='1')bars+='<rect x="'+((quietModules+i)*moduleWidth)+'" y="0" width="'+moduleWidth+'" height="'+barHeight+'"></rect>';
+    }
+    return '<svg class="air-ean13" role="img" aria-label="Airレジ用バーコード '+esc(code)+'" viewBox="0 0 '+width+' 108" preserveAspectRatio="xMidYMid meet">'+
+      '<rect x="0" y="0" width="'+width+'" height="108" fill="#fff"></rect>'+
+      '<g fill="#000" shape-rendering="crispEdges">'+bars+'</g>'+
+      '<text x="'+(width/2)+'" y="101" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" letter-spacing="2" fill="#000">'+esc(code)+'</text>'+
+    '</svg>';
+  }
+
+  function renderSeatCheckoutBarcodes(activeOrders){
+    var rows=[], index={};
+    (activeOrders||[]).forEach(function(o){
+      (o.items||[]).forEach(function(item){
+        if(item.category==='Fee')return;
+        var code=resolveAirCodeForItem(item);
+        var label=String(item.displayName||item.name||'商品');
+        var key=code+'|||'+label;
+        if(!index[key]){
+          index[key]={name:item.name||label,label:label,code:code,qty:0};
+          rows.push(index[key]);
+        }
+        index[key].qty+=Math.max(1,Number(item.qty||1));
+      });
+    });
+    if(!rows.length)return '';
+    var mapped=rows.filter(function(x){return !!x.code});
+    var missing=rows.filter(function(x){return !x.code});
+    var scanCount=mapped.reduce(function(sum,x){return sum+x.qty},0);
+    return '<section class="air-scan-panel">'+
+      '<div class="air-scan-head"><div><span class="air-scan-kicker">AIRレジ会計</span><h4>会計用バーコード</h4><p>お客様と注文内容を確認しながら、上から読み取ってください。</p></div>'+
+      '<div class="air-scan-total"><strong>'+scanCount+'</strong><span>回スキャン</span></div></div>'+
+      '<div class="air-scan-list">'+mapped.map(function(x){
+        return '<div class="air-scan-card">'+
+          '<div class="air-scan-product"><div><strong>'+esc(x.label)+'</strong><small>Airレジ商品コード '+esc(x.code)+'</small></div>'+
+          '<div class="air-scan-qty"><strong>×'+x.qty+'</strong><span>'+(x.qty>1?x.qty+'回読み取り':'1回読み取り')+'</span></div></div>'+
+          '<div class="air-barcode-wrap">'+ean13Svg(x.code)+'</div>'+
+        '</div>';
+      }).join('')+'</div>'+
+      (missing.length?'<div class="air-scan-missing"><strong>⚠ バーコード未登録</strong>'+
+        missing.map(function(x){return '<span>'+esc(x.label)+' ×'+x.qty+'</span>'}).join('')+
+        '<small>この商品はAirレジへ手動で入力してください。</small></div>':'')+
+    '</section>';
+  }
   var INVENTORY_SEED_VERSION=7;
   var INVENTORY_SEED=[
     {name:'紅茶Twining',stock:'',min:25,unit:'bag',shop:'コスモス',section:'棚1',order1:1,order2:1,packSize:25},
@@ -354,6 +517,7 @@
 
     if(backendReady){
       await loadSeatAccess();
+      await loadAirMappings();
       await syncSharedStates();
       await syncOrdersFromServer(true);
       if(!serverSyncTimer)serverSyncTimer=setInterval(function(){syncOrdersFromServer(false)},2000);
@@ -577,6 +741,7 @@
       '<div class="detail-head"><div><h3>'+esc(seat)+'</h3><span class="detail-meta">現在の注文 '+activeOrders.length+'件</span></div><span class="status-chip '+(isOpen?(activeOrders[0]?activeOrders[0].status:'paid'):'closed')+'">'+(isOpen?(activeOrders.length?'注文あり':'注文受付中'):'注文停止中')+'</span></div>'+
       '<div class="seat-access-control '+(isOpen?'open':'closed')+'"><div><strong>'+(isOpen?'この席は注文受付中':'この席は注文停止中')+'</strong><span>'+(isOpen?'退店したら停止してください。停止後はお客様のスマホから注文できません。':'次のお客様が着席したら「着席・注文受付開始」を押してください。')+'</span></div><button class="'+(isOpen?'danger-btn':'primary-btn')+'" id="toggleSeatAccess">'+(isOpen?'退店・注文を停止':'着席・注文受付開始')+'</button></div>'+
       (activeOrders.length?'<div class="seat-running-total"><span>現在の席合計</span><strong>'+yen(activeTotal)+'</strong></div>':'')+
+      (activeOrders.length?renderSeatCheckoutBarcodes(activeOrders):'')+
       '<div class="seat-history-section"><div class="seat-history-title"><strong>現在の注文</strong><span>'+activeOrders.length+'件</span></div>'+
       (activeOrders.length?activeOrders.map(function(o,i){return seatOrderBlock(o,i,false)}).join(''):'<p class="note">未会計の注文はありません。</p>')+
       '</div>'+
