@@ -543,6 +543,15 @@ async function createOrder(request, env) {
     }, 400);
   }
 
+  const expandedItemCount = items.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+  if (expandedItemCount > 20) {
+    return json({
+      ok: false,
+      error: "TOO_MANY_AIR_ITEMS",
+      message: "1回の注文は合計20点までです。"
+    }, 409);
+  }
+
   const drinkSatisfied =
     hasDrinkInItems(items) ||
     await hasDrinkForSeatSession(env, seat, access.updatedAt);
