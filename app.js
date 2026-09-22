@@ -1213,6 +1213,37 @@
     $('#cartSummary').textContent=q+'点 / '+yen(a.total);
     renderDrinkUpsell();
   }
+  function makeOrderRequestId(){
+    try{
+      if(window.crypto&&typeof window.crypto.randomUUID==='function')return window.crypto.randomUUID();
+    }catch(e){}
+    return 'ord-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);
+  }
+  function orderRequestSignature(payload){
+    try{
+      return JSON.stringify({
+        seat:payload.seat,
+        items:(payload.items||[]).map(function(i){
+          return {name:i.name,displayName:i.displayName||'',price:Number(i.price||0),qty:Number(i.qty||0),option:i.option||''};
+        }),
+        note:payload.note||''
+      });
+    }catch(e){return String(Date.now())}
+  }
+  function getOrCreateOrderRequestId(payload){
+    var sig=orderRequestSignature(payload), now=Date.now(), saved=load('ippukuPendingOrderRequest',null);
+    if(saved&&saved.id&&saved.sig===sig&&now-Number(saved.ts||0)<10*60*1000)return String(saved.id);
+    var id=makeOrderRequestId();
+    save('ippukuPendingOrderRequest',{id:id,sig:sig,ts:now});
+    return id;
+  }
+  function clearPendingOrderRequest(id){
+    var saved=load('ippukuPendingOrderRequest',null);
+    if(saved&&String(saved.id||'')===String(id||'')){
+      try{localStorage.removeItem('ippukuPendingOrderRequest')}catch(e){}
+    }
+  }
+
   function signalNewOrderSafely(order){
     setTimeout(function(){
       try{
@@ -1277,6 +1308,8 @@
             items:cart.map(function(i){return Object.assign({},i)}),
             note:noteEl?noteEl.value:''
           };
+          // 通信タイムアウト後に同じ注文を再送しても、サーバー側で同一注文として扱う。
+          payload.requestId=getOrCreateOrderRequestId(payload);
           var newOrder;
           if(!backendReady){
             await detectBackend();
@@ -1301,6 +1334,7 @@
           // ここまで来た時点でサーバー側では注文確定済み。
           // 以降の画面描画エラーで「注文失敗」と誤表示しない。
           newOrder=result.data.order;
+          clearPendingOrderRequest(payload.requestId);
           if(cartHasDrink(payload.items))customerDrinkSatisfied=true;
           try{
             orders=[newOrder].concat(orders.filter(function(x){return String(x.id)!==String(newOrder.id)}));
@@ -1332,7 +1366,8 @@
 
           // HTTP 201 + order が返っているなら注文は確定済み。
           // 画面側の後処理だけで落ちても失敗表示にはしない。
-          if(typeof result!=='undefined'&&result&&result.status===201&&result.data&&result.data.order){
+          if(typeof result!=='undefined'&&result&&result.ok&&result.data&&result.data.order){
+            if(typeof payload!=='undefined'&&payload&&payload.requestId)clearPendingOrderRequest(payload.requestId);
             cart=[];
             try{renderCart()}catch(uiErr){}
             try{closeModal()}catch(uiErr){}
