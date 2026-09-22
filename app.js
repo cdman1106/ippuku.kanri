@@ -1327,6 +1327,9 @@
           if(result.status===409&&result.data&&result.data.error==='AIRREGI_UNAVAILABLE'){
             throw new Error('AIRREGI_UNAVAILABLE');
           }
+          if(result.status===409&&result.data&&result.data.error==='TOO_MANY_AIR_ITEMS'){
+            throw new Error('TOO_MANY_AIR_ITEMS');
+          }
           if(result.status===400&&result.data&&result.data.error==='INVALID_MENU_ITEM'){
             throw new Error('INVALID_MENU_ITEM');
           }
@@ -1401,6 +1404,8 @@
               '\nこの商品はスタッフへ直接ご注文ください。');
           }else if(e&&e.message==='INVALID_MENU_ITEM'){
             alert('メニュー情報が更新されています。画面を再読み込みしてから、もう一度商品を選択してください。');
+          }else if(e&&e.message==='TOO_MANY_AIR_ITEMS'){
+            alert('1回の注文は合計20点までです。数量を減らしてからもう一度お試しください。');
           }else if(e&&e.message==='BACKEND_OFFLINE'){
             alert('現在、注文サーバーに接続できません。注文は送信されていません。スタッフへお声がけください。');
           }else{
