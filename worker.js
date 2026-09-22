@@ -6,6 +6,7 @@ const SEATS = new Set([
 const STATUSES = new Set(["ordered","preparing","served","paid"]);
 const DRINK_CATEGORIES = new Set(["Café","Relax","Refresh"]);
 const APP_STATE_KEYS = new Set(["sales","inventory","reserves","promos"]);
+const BRIDGE_TOKEN_SHA256 = "1b080489510b2ee4fdfb387e120e4bc2ff0bcc16745f293e909df8f69265222b";
 
 // Airレジ商品一括編集CSV（2026-09-21）から、現在のモバイルオーダー掲載商品だけを抽出。
 // バーコード先頭の # はCSV表示用なので、Airレジ検索へ送る値では外す。
@@ -158,6 +159,7 @@ async function ensureOrdersTables(env) {
   await addColumnIfMissing(env, "orders", ordersCols, "bridge_claimed_at", "bridge_claimed_at TEXT NOT NULL DEFAULT ''");
   await addColumnIfMissing(env, "orders", ordersCols, "bridge_completed_at", "bridge_completed_at TEXT NOT NULL DEFAULT ''");
   await addColumnIfMissing(env, "orders", ordersCols, "bridge_error", "bridge_error TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing(env, "orders", ordersCols, "client_request_id", "client_request_id TEXT NOT NULL DEFAULT ''");
 
   const itemCols = await tableColumns(env, "order_items");
   await addColumnIfMissing(env, "order_items", itemCols, "display_name", "display_name TEXT NOT NULL DEFAULT ''");
@@ -170,6 +172,7 @@ async function ensureOrdersTables(env) {
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_bridge_status ON orders(bridge_status, created_at)").run();
+  await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_client_request_id ON orders(client_request_id) WHERE client_request_id != ''").run();
 
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS air_product_map (name TEXT NOT NULL, option_text TEXT NOT NULL DEFAULT '', air_code TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (name, option_text))"
@@ -178,6 +181,9 @@ async function ensureOrdersTables(env) {
   // Bridge端末ごとの監視開始時刻。監視開始前の古いpending注文を拾わないために使う。
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS bridge_devices (device TEXT PRIMARY KEY, session_started_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+  ).run();
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS bridge_config (config_key TEXT PRIMARY KEY, value_text TEXT NOT NULL, updated_at TEXT NOT NULL)"
   ).run();
 }
 
@@ -426,6 +432,25 @@ async function createOrder(request, env) {
   const seat = String(body.seat || "");
   if (!SEATS.has(seat)) return json({ ok: false, error: "INVALID_SEAT" }, 400);
 
+  const requestId = String(body.requestId || "").trim().slice(0, 100);
+  if (requestId && !/^[A-Za-z0-9._:-]{8,100}$/.test(requestId)) {
+    return json({ ok: false, error: "INVALID_REQUEST_ID" }, 400);
+  }
+
+  // 同じ送信IDは同じ注文として返す。通信タイムアウト後の再タップで
+  // 注文やAirレジ伝票が二重作成されるのを防ぐ。
+  if (requestId) {
+    const existing = await env.DB.prepare(
+      "SELECT id, seat FROM orders WHERE client_request_id = ? LIMIT 1"
+    ).bind(requestId).first();
+    if (existing?.id) {
+      if (String(existing.seat || "") !== seat) {
+        return json({ ok: false, error: "REQUEST_ID_CONFLICT" }, 409);
+      }
+      return json({ ok: true, duplicate: true, order: await getOrder(env, existing.id) }, 200);
+    }
+  }
+
   const access = await getSeatAccess(env, seat);
   if (!access.open) return json({ ok: false, error: "SEAT_CLOSED" }, 403);
 
@@ -451,7 +476,6 @@ async function createOrder(request, env) {
   const note = String(body.note || "").slice(0, 500);
   const subtotal = items.reduce((sum, x) => sum + x.price * x.qty, 0);
   const nightFeeBase = items.reduce((sum, x) => {
-    // ZIPPOガチャとThe Cling Lighterガチャは深夜料金の対象外。
     if (x.name === "ZIPPOガチャ" || x.name === "The Cling Lighter ガチャ") return sum;
     return sum + x.price * x.qty;
   }, 0);
@@ -470,8 +494,8 @@ async function createOrder(request, env) {
 
   try {
     await env.DB.prepare(
-      "INSERT INTO orders (id, seat, status, total, note, created_at, updated_at, bridge_status) VALUES (?, ?, 'ordered', ?, ?, ?, ?, 'pending')"
-    ).bind(id, seat, total, note, now, now).run();
+      "INSERT INTO orders (id, seat, status, total, note, created_at, updated_at, bridge_status, client_request_id) VALUES (?, ?, 'ordered', ?, ?, ?, ?, 'pending', ?)"
+    ).bind(id, seat, total, note, now, now, requestId).run();
 
     const itemStatements = items.map((item) =>
       env.DB.prepare(
@@ -480,9 +504,20 @@ async function createOrder(request, env) {
     );
     if (itemStatements.length) await env.DB.batch(itemStatements);
 
-    return json({ ok: true, order: await getOrder(env, id) }, 201);
+    return json({ ok: true, duplicate: false, order: await getOrder(env, id) }, 201);
   } catch (error) {
-    // 注文ヘッダーだけ作成された場合は残さない。
+    // UNIQUE競合は、最初の送信が成功して応答だけ失われたケースとして回収する。
+    if (requestId) {
+      try {
+        const existing = await env.DB.prepare(
+          "SELECT id, seat FROM orders WHERE client_request_id = ? LIMIT 1"
+        ).bind(requestId).first();
+        if (existing?.id && String(existing.seat || "") === seat) {
+          return json({ ok: true, duplicate: true, order: await getOrder(env, existing.id) }, 200);
+        }
+      } catch {}
+    }
+
     try { await env.DB.prepare("DELETE FROM order_items WHERE order_id = ?").bind(id).run(); } catch {}
     try { await env.DB.prepare("DELETE FROM orders WHERE id = ?").bind(id).run(); } catch {}
     return json({
@@ -579,24 +614,78 @@ async function upsertAirMapping(request, env) {
   return json({ ok: true, name, option: optionText, airCode, updatedAt: now });
 }
 
-function bridgeRequestAuthorized(request, env) {
-  // AIR_BRIDGE_TOKEN をCloudflare Secretに設定した時だけ認証を強制する。
-  // 未設定中は既存端末との互換性を保つ。
-  const required = String(env.AIR_BRIDGE_TOKEN || "").trim();
-  if (!required) return true;
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(String(value || ""));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function bridgeTokenMatches(request, env) {
   const auth = String(request.headers.get("Authorization") || "");
-  return auth === "Bearer " + required;
+  const prefix = "Bearer ";
+  if (!auth.startsWith(prefix)) return false;
+  const token = auth.slice(prefix.length).trim();
+  if (!token) return false;
+
+  // Cloudflare Secretが設定されている環境ではSecretを優先。
+  const secret = String(env.AIR_BRIDGE_TOKEN || "").trim();
+  if (secret) return token === secret;
+
+  // Public repoにはトークン本体を置かず、強いランダムトークンのSHA-256だけを保持。
+  return (await sha256Hex(token)) === BRIDGE_TOKEN_SHA256;
+}
+
+async function bridgeAuthEnabled(env) {
+  await ensureOrdersTables(env);
+  const row = await env.DB.prepare(
+    "SELECT value_text FROM bridge_config WHERE config_key = 'auth_enabled'"
+  ).first();
+  return String(row?.value_text || "") === "1";
+}
+
+async function activateBridgeAuth(request, env) {
+  await ensureOrdersTables(env);
+  if (!(await bridgeTokenMatches(request, env))) {
+    return json({ ok: false, error: "INVALID_BRIDGE_TOKEN" }, 401);
+  }
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO bridge_config (config_key, value_text, updated_at) VALUES ('auth_enabled','1',?) ON CONFLICT(config_key) DO UPDATE SET value_text='1', updated_at=excluded.updated_at"
+  ).bind(now).run();
+  return json({ ok: true, authEnabled: true });
+}
+
+async function bridgeRequestAuthorized(request, env) {
+  if (!(await bridgeAuthEnabled(env))) return true;
+  return bridgeTokenMatches(request, env);
 }
 
 async function startBridgeSession(request, env) {
   await ensureOrdersTables(env);
   const body = await request.json().catch(() => ({}));
   const device = String(body?.device || "galaxy").trim().slice(0, 80) || "galaxy";
+
+  // 本番開始時刻は最初の1回だけ固定。監視OFF/ONや端末再起動で更新しない。
+  // これにより停止中に入った正規注文を失わず、導入前の古いテスト注文だけ除外する。
+  const existing = await env.DB.prepare(
+    "SELECT session_started_at FROM bridge_devices WHERE device = ?"
+  ).bind(device).first();
+  if (existing?.session_started_at) {
+    return json({
+      ok: true,
+      device,
+      sessionStartedAt: String(existing.session_started_at),
+      existing: true
+    });
+  }
+
   const now = new Date().toISOString();
   await env.DB.prepare(
-    "INSERT INTO bridge_devices (device, session_started_at, updated_at) VALUES (?, ?, ?) ON CONFLICT(device) DO UPDATE SET session_started_at = excluded.session_started_at, updated_at = excluded.updated_at"
+    "INSERT INTO bridge_devices (device, session_started_at, updated_at) VALUES (?, ?, ?)"
   ).bind(device, now, now).run();
-  return json({ ok: true, device, sessionStartedAt: now });
+  return json({ ok: true, device, sessionStartedAt: now, existing: false });
 }
 
 async function getBridgeSessionStart(env, device) {
@@ -608,10 +697,9 @@ async function getBridgeSessionStart(env, device) {
 
 async function bridgeRecoveryStatus(env) {
   await ensureOrdersTables(env);
-  const since = currentBusinessDayStartIso();
   const result = await env.DB.prepare(
-    "SELECT id, seat, bridge_status, bridge_device, bridge_claimed_at, bridge_error, created_at FROM orders WHERE created_at >= ? AND bridge_status IN ('processing','error') ORDER BY created_at ASC LIMIT 10"
-  ).bind(since).all();
+    "SELECT id, seat, bridge_status, bridge_device, bridge_claimed_at, bridge_error, created_at FROM orders WHERE bridge_status IN ('processing','error') ORDER BY created_at ASC LIMIT 20"
+  ).all();
 
   const orders = [];
   for (const row of (result.results || [])) {
@@ -624,6 +712,8 @@ async function bridgeRecoveryStatus(env) {
       claimedAt: row.bridge_claimed_at || "",
       error: row.bridge_error || "",
       createdAt: row.created_at || "",
+      note: order?.note || "",
+      total: Number(order?.total || 0),
       items: order?.items || []
     });
   }
@@ -685,9 +775,14 @@ async function claimBridgeOrder(request, env) {
 
   const expanded = [];
   const missingMappings = [];
+  let nightFee = 0;
   for (const item of order.items || []) {
-    // 深夜料金などの料金行はAirレジの商品入力対象にしない。
-    if (item.category === "Fee") continue;
+    // 深夜料金は支払い直前にメインiPadでスタッフが加算する。
+    // HIDの実機成功経路を壊さないため、商品入力マクロには混ぜない。
+    if (item.category === "Fee") {
+      nightFee += Number(item.price || 0) * Math.max(1, Number(item.qty || 1));
+      continue;
+    }
     const code = await resolveAirCode(env, item.name, item.option || "");
     if (!code) {
       missingMappings.push({
@@ -767,6 +862,9 @@ async function claimBridgeOrder(request, env) {
       createdAt: order.createdAt,
       itemCount: expanded.length,
       items: expanded,
+      note: order.note || "",
+      webTotal: Number(order.total || 0),
+      nightFee,
       // 旧版Air Bridgeとの後方互換用。
       item: expanded[0]
     }
@@ -815,15 +913,18 @@ async function bridgeStatus(env) {
   ).bind(since).all();
   const counts = {};
   for (const row of (result.results || [])) counts[row.bridge_status || "legacy"] = Number(row.count || 0);
+  const authEnabled = await bridgeAuthEnabled(env);
   return json({
     ok: true,
     since,
     counts,
     safety: {
-      sessionCutoff: true,
+      persistentCutover: true,
       manualRecovery: true,
-      optionalTokenAuth: true,
-      autoRetry: false
+      tokenAuth: true,
+      authEnabled,
+      autoRetry: false,
+      idempotentOrders: true
     }
   });
 }
@@ -866,7 +967,11 @@ async function handleApi(request, env) {
     return setSeatAccess(request, env, decodeURIComponent(seatMatch[1]));
   }
 
-  if (url.pathname.startsWith("/api/bridge/") && !bridgeRequestAuthorized(request, env)) {
+  if (url.pathname === "/api/bridge/auth/activate" && request.method === "POST") {
+    return activateBridgeAuth(request, env);
+  }
+
+  if (url.pathname.startsWith("/api/bridge/") && !(await bridgeRequestAuthorized(request, env))) {
     return json({ ok: false, error: "UNAUTHORIZED" }, 401);
   }
 
