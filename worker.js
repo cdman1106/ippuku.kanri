@@ -578,6 +578,7 @@ async function claimBridgeOrder(request, env) {
   await ensureOrdersTables(env);
   const body = await request.json().catch(() => ({}));
   const device = String(body?.device || "galaxy").trim().slice(0, 80) || "galaxy";
+  const multiItemLearned = body?.multiItemLearned === true;
   const since = currentBusinessDayStartIso();
 
   // Strict FIFO. Do not skip an older pending order because that would change table order.
@@ -593,6 +594,8 @@ async function claimBridgeOrder(request, env) {
   const expanded = [];
   const missingMappings = [];
   for (const item of order.items || []) {
+    // 深夜料金などの料金行はAirレジの商品入力対象にしない。
+    if (item.category === "Fee") continue;
     const code = await resolveAirCode(env, item.name, item.option || "");
     if (!code) {
       missingMappings.push({
@@ -623,13 +626,34 @@ async function claimBridgeOrder(request, env) {
     });
   }
 
-  // We have only verified the exact Airレジ focus path for one product.
-  // Refuse multi-item/qty>1 instead of creating an incorrect slip.
-  if (expanded.length !== 1) {
+  if (!expanded.length) {
     return json({
       ok: true,
       blocked: true,
-      reason: "MULTI_ITEM_NOT_VERIFIED",
+      reason: "NO_AIR_ITEMS",
+      orderId: order.id,
+      seat: order.seat
+    });
+  }
+
+  // 複数商品は、Galaxy側に保存済みの2商品実機記録がある場合だけ許可する。
+  // 旧版Galaxyには従来どおり渡さず、誤伝票を防ぐ。
+  if (expanded.length > 1 && !multiItemLearned) {
+    return json({
+      ok: true,
+      blocked: true,
+      reason: "MULTI_ITEM_TEMPLATE_REQUIRED",
+      orderId: order.id,
+      seat: order.seat,
+      itemCount: expanded.length
+    });
+  }
+
+  if (expanded.length > 20) {
+    return json({
+      ok: true,
+      blocked: true,
+      reason: "TOO_MANY_ITEMS",
       orderId: order.id,
       seat: order.seat,
       itemCount: expanded.length
@@ -649,6 +673,9 @@ async function claimBridgeOrder(request, env) {
       id: order.id,
       seat: order.seat,
       createdAt: order.createdAt,
+      itemCount: expanded.length,
+      items: expanded,
+      // 旧版Air Bridgeとの後方互換用。
       item: expanded[0]
     }
   });
