@@ -174,6 +174,11 @@ async function ensureOrdersTables(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS air_product_map (name TEXT NOT NULL, option_text TEXT NOT NULL DEFAULT '', air_code TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (name, option_text))"
   ).run();
+
+  // Bridge端末ごとの監視開始時刻。監視開始前の古いpending注文を拾わないために使う。
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS bridge_devices (device TEXT PRIMARY KEY, session_started_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+  ).run();
 }
 
 async function hasDrinkForSeatSession(env, seat, since) {
@@ -574,14 +579,101 @@ async function upsertAirMapping(request, env) {
   return json({ ok: true, name, option: optionText, airCode, updatedAt: now });
 }
 
+function bridgeRequestAuthorized(request, env) {
+  // AIR_BRIDGE_TOKEN をCloudflare Secretに設定した時だけ認証を強制する。
+  // 未設定中は既存端末との互換性を保つ。
+  const required = String(env.AIR_BRIDGE_TOKEN || "").trim();
+  if (!required) return true;
+  const auth = String(request.headers.get("Authorization") || "");
+  return auth === "Bearer " + required;
+}
+
+async function startBridgeSession(request, env) {
+  await ensureOrdersTables(env);
+  const body = await request.json().catch(() => ({}));
+  const device = String(body?.device || "galaxy").trim().slice(0, 80) || "galaxy";
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO bridge_devices (device, session_started_at, updated_at) VALUES (?, ?, ?) ON CONFLICT(device) DO UPDATE SET session_started_at = excluded.session_started_at, updated_at = excluded.updated_at"
+  ).bind(device, now, now).run();
+  return json({ ok: true, device, sessionStartedAt: now });
+}
+
+async function getBridgeSessionStart(env, device) {
+  const row = await env.DB.prepare(
+    "SELECT session_started_at FROM bridge_devices WHERE device = ?"
+  ).bind(device).first();
+  return row?.session_started_at ? String(row.session_started_at) : "";
+}
+
+async function bridgeRecoveryStatus(env) {
+  await ensureOrdersTables(env);
+  const since = currentBusinessDayStartIso();
+  const result = await env.DB.prepare(
+    "SELECT id, seat, bridge_status, bridge_device, bridge_claimed_at, bridge_error, created_at FROM orders WHERE created_at >= ? AND bridge_status IN ('processing','error') ORDER BY created_at ASC LIMIT 10"
+  ).bind(since).all();
+
+  const orders = [];
+  for (const row of (result.results || [])) {
+    const order = await getOrder(env, row.id);
+    orders.push({
+      id: row.id,
+      seat: row.seat || "",
+      bridgeStatus: row.bridge_status || "",
+      device: row.bridge_device || "",
+      claimedAt: row.bridge_claimed_at || "",
+      error: row.bridge_error || "",
+      createdAt: row.created_at || "",
+      items: order?.items || []
+    });
+  }
+  return json({ ok: true, orders });
+}
+
+async function recoverBridgeOrder(request, env, id) {
+  await ensureOrdersTables(env);
+  const body = await request.json().catch(() => ({}));
+  const action = String(body?.action || "");
+  const now = new Date().toISOString();
+
+  if (action === "complete") {
+    const result = await env.DB.prepare(
+      "UPDATE orders SET bridge_status = 'completed', bridge_completed_at = ?, bridge_error = '', updated_at = ? WHERE id = ? AND bridge_status IN ('processing','error')"
+    ).bind(now, now, id).run();
+    if (!result.meta?.changes) return json({ ok: false, error: "NOT_RECOVERABLE" }, 409);
+    return json({ ok: true, id, bridgeStatus: "completed" });
+  }
+
+  if (action === "retry") {
+    const result = await env.DB.prepare(
+      "UPDATE orders SET bridge_status = 'pending', bridge_device = '', bridge_claimed_at = '', bridge_completed_at = '', bridge_error = '', updated_at = ? WHERE id = ? AND bridge_status IN ('processing','error')"
+    ).bind(now, id).run();
+    if (!result.meta?.changes) return json({ ok: false, error: "NOT_RECOVERABLE" }, 409);
+    return json({ ok: true, id, bridgeStatus: "pending" });
+  }
+
+  return json({ ok: false, error: "INVALID_RECOVERY_ACTION" }, 400);
+}
+
 async function claimBridgeOrder(request, env) {
   await ensureOrdersTables(env);
   const body = await request.json().catch(() => ({}));
   const device = String(body?.device || "galaxy").trim().slice(0, 80) || "galaxy";
   const multiItemLearned = body?.multiItemLearned === true;
-  const since = currentBusinessDayStartIso();
+  const sessionAware = body?.sessionAware === true;
+  const businessSince = currentBusinessDayStartIso();
 
-  // Strict FIFO. Do not skip an older pending order because that would change table order.
+  let since = businessSince;
+  if (sessionAware) {
+    const sessionStartedAt = await getBridgeSessionStart(env, device);
+    if (!sessionStartedAt) {
+      return json({ ok: true, blocked: true, reason: "SESSION_START_REQUIRED" });
+    }
+    // ISO 8601 UTC文字列なので同形式なら文字列比較で時系列順になる。
+    if (sessionStartedAt > since) since = sessionStartedAt;
+  }
+
+  // 監視開始前の古いpendingは飛ばし、開始後だけをFIFO処理する。
   const row = await env.DB.prepare(
     "SELECT id FROM orders WHERE status = 'ordered' AND bridge_status = 'pending' AND created_at >= ? ORDER BY created_at ASC LIMIT 1"
   ).bind(since).first();
@@ -723,7 +815,17 @@ async function bridgeStatus(env) {
   ).bind(since).all();
   const counts = {};
   for (const row of (result.results || [])) counts[row.bridge_status || "legacy"] = Number(row.count || 0);
-  return json({ ok: true, since, counts });
+  return json({
+    ok: true,
+    since,
+    counts,
+    safety: {
+      sessionCutoff: true,
+      manualRecovery: true,
+      optionalTokenAuth: true,
+      autoRetry: false
+    }
+  });
 }
 
 async function handleApi(request, env) {
@@ -764,6 +866,17 @@ async function handleApi(request, env) {
     return setSeatAccess(request, env, decodeURIComponent(seatMatch[1]));
   }
 
+  if (url.pathname.startsWith("/api/bridge/") && !bridgeRequestAuthorized(request, env)) {
+    return json({ ok: false, error: "UNAUTHORIZED" }, 401);
+  }
+
+  if (url.pathname === "/api/bridge/session/start" && request.method === "POST") {
+    return startBridgeSession(request, env);
+  }
+  if (url.pathname === "/api/bridge/recovery" && request.method === "GET") {
+    return bridgeRecoveryStatus(env);
+  }
+
   if (url.pathname === "/api/bridge/status" && request.method === "GET") {
     return bridgeStatus(env);
   }
@@ -777,13 +890,14 @@ async function handleApi(request, env) {
     return claimBridgeOrder(request, env);
   }
 
-  const bridgeOrderMatch = url.pathname.match(/^\/api\/bridge\/orders\/([^/]+)\/(complete|error|retry)$/);
+  const bridgeOrderMatch = url.pathname.match(/^\/api\/bridge\/orders\/([^/]+)\/(complete|error|retry|recover)$/);
   if (bridgeOrderMatch) {
     const id = decodeURIComponent(bridgeOrderMatch[1]);
     const action = bridgeOrderMatch[2];
     if (action === "complete" && request.method === "POST") return finishBridgeOrder(request, env, id, true);
     if (action === "error" && request.method === "POST") return finishBridgeOrder(request, env, id, false);
     if (action === "retry" && request.method === "POST") return retryBridgeOrder(env, id);
+    if (action === "recover" && request.method === "POST") return recoverBridgeOrder(request, env, id);
   }
 
   if (url.pathname === "/api/orders" && request.method === "GET") {
