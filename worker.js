@@ -706,11 +706,23 @@ async function getBridgeSessionStart(env, device) {
   return row?.session_started_at ? String(row.session_started_at) : "";
 }
 
-async function bridgeRecoveryStatus(env) {
+async function bridgeRecoveryStatus(request, env) {
   await ensureOrdersTables(env);
-  const result = await env.DB.prepare(
-    "SELECT id, seat, bridge_status, bridge_device, bridge_claimed_at, bridge_error, created_at FROM orders WHERE bridge_status IN ('processing','error') ORDER BY created_at ASC LIMIT 20"
-  ).all();
+  const url = new URL(request.url);
+  const device = String(url.searchParams.get("device") || "").trim().slice(0, 80);
+  const sessionStartedAt = device ? await getBridgeSessionStart(env, device) : "";
+
+  let result;
+  if (sessionStartedAt) {
+    // 本番開始時刻より前のテスト用error/processingは復旧対象にしない。
+    result = await env.DB.prepare(
+      "SELECT id, seat, bridge_status, bridge_device, bridge_claimed_at, bridge_error, created_at FROM orders WHERE created_at >= ? AND bridge_status IN ('processing','error') ORDER BY created_at ASC LIMIT 20"
+    ).bind(sessionStartedAt).all();
+  } else {
+    result = await env.DB.prepare(
+      "SELECT id, seat, bridge_status, bridge_device, bridge_claimed_at, bridge_error, created_at FROM orders WHERE bridge_status IN ('processing','error') ORDER BY created_at DESC LIMIT 20"
+    ).all();
+  }
 
   const orders = [];
   for (const row of (result.results || [])) {
@@ -728,7 +740,7 @@ async function bridgeRecoveryStatus(env) {
       items: order?.items || []
     });
   }
-  return json({ ok: true, orders });
+  return json({ ok: true, device, sessionStartedAt, orders });
 }
 
 async function recoverBridgeOrder(request, env, id) {
@@ -993,7 +1005,7 @@ async function handleApi(request, env) {
     return resetBridgeSession(request, env);
   }
   if (url.pathname === "/api/bridge/recovery" && request.method === "GET") {
-    return bridgeRecoveryStatus(env);
+    return bridgeRecoveryStatus(request, env);
   }
 
   if (url.pathname === "/api/bridge/status" && request.method === "GET") {
