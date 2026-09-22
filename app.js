@@ -1324,6 +1324,12 @@
           if(result.status===409&&result.data&&result.data.error==='DRINK_REQUIRED'){
             throw new Error('DRINK_REQUIRED');
           }
+          if(result.status===409&&result.data&&result.data.error==='AIRREGI_UNAVAILABLE'){
+            throw new Error('AIRREGI_UNAVAILABLE');
+          }
+          if(result.status===400&&result.data&&result.data.error==='INVALID_MENU_ITEM'){
+            throw new Error('INVALID_MENU_ITEM');
+          }
           if(result.status===403&&result.data&&result.data.error==='SEAT_CLOSED'){
             customerSeatOpen=false;
             refreshCustomerSeatAccess(false);
@@ -1385,6 +1391,16 @@
             alert('この席の注文受付は終了しました。スタッフへお声がけください。');
           }else if(e&&e.message==='DRINK_REQUIRED'){
             alert('当店はワンドリンクオーダー制です。ドリンクを1杯以上ご注文ください。');
+          }else if(e&&e.message==='AIRREGI_UNAVAILABLE'){
+            var unavailableNames=[];
+            try{
+              unavailableNames=(result.data.items||[]).map(function(x){return x.displayName||x.name}).filter(Boolean);
+            }catch(uiErr){}
+            alert('現在モバイル注文に対応していない商品が含まれています。'+
+              (unavailableNames.length?'\n'+unavailableNames.join('\n'):'')+
+              '\nこの商品はスタッフへ直接ご注文ください。');
+          }else if(e&&e.message==='INVALID_MENU_ITEM'){
+            alert('メニュー情報が更新されています。画面を再読み込みしてから、もう一度商品を選択してください。');
           }else if(e&&e.message==='BACKEND_OFFLINE'){
             alert('現在、注文サーバーに接続できません。注文は送信されていません。スタッフへお声がけください。');
           }else{
