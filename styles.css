@@ -1238,3 +1238,201 @@ textarea:-webkit-autofill,select:-webkit-autofill{
   color:#fff!important;
   -webkit-text-fill-color:#fff!important;
 }
+
+
+/* ===== Airレジ 会計用バーコード ===== */
+.air-scan-panel{
+  margin:18px 0 22px;
+  padding:18px;
+  border:2px solid #111827;
+  border-radius:18px;
+  background:#f8fafc;
+  color:#111827;
+}
+.air-scan-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:14px;
+}
+.air-scan-head h4{
+  margin:3px 0 4px;
+  font-size:22px;
+  line-height:1.25;
+}
+.air-scan-head p{
+  margin:0;
+  color:#475569;
+  font-size:14px;
+}
+.air-scan-kicker{
+  display:block;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.12em;
+  color:#475569;
+}
+.air-scan-total{
+  min-width:84px;
+  padding:10px 12px;
+  border-radius:14px;
+  background:#111827;
+  color:#fff;
+  text-align:center;
+}
+.air-scan-total strong{
+  display:block;
+  font-size:28px;
+  line-height:1;
+}
+.air-scan-total span{
+  display:block;
+  margin-top:4px;
+  font-size:11px;
+  font-weight:700;
+}
+.air-scan-list{
+  display:grid;
+  gap:14px;
+}
+.air-scan-card{
+  padding:14px;
+  border:1px solid #cbd5e1;
+  border-radius:15px;
+  background:#fff;
+}
+.air-scan-product{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+.air-scan-product > div:first-child{
+  min-width:0;
+}
+.air-scan-product strong{
+  display:block;
+  font-size:17px;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+.air-scan-product small{
+  display:block;
+  margin-top:3px;
+  color:#64748b;
+  font-size:11px;
+}
+.air-scan-qty{
+  flex:0 0 auto;
+  min-width:92px;
+  padding:8px 10px;
+  border-radius:12px;
+  background:#f1f5f9;
+  text-align:center;
+}
+.air-scan-qty strong{
+  display:block;
+  font-size:24px;
+  line-height:1;
+}
+.air-scan-qty span{
+  display:block;
+  margin-top:4px;
+  font-size:11px;
+  font-weight:800;
+}
+.air-barcode-wrap{
+  overflow:hidden;
+  padding:8px;
+  border:1px solid #e2e8f0;
+  border-radius:10px;
+  background:#fff;
+}
+.air-ean13{
+  display:block;
+  width:100%;
+  max-width:520px;
+  height:auto;
+  margin:0 auto;
+  background:#fff;
+}
+.air-barcode-invalid{
+  padding:20px;
+  text-align:center;
+  color:#b91c1c;
+  background:#fff;
+}
+.air-barcode-invalid code{
+  color:#111827;
+}
+.air-scan-missing{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+  margin-top:14px;
+  padding:12px;
+  border:1px solid #f59e0b;
+  border-radius:12px;
+  background:#fffbeb;
+  color:#92400e;
+}
+.air-scan-missing strong{
+  width:100%;
+}
+.air-scan-missing span{
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:999px;
+  background:#fff;
+  font-size:13px;
+  font-weight:700;
+}
+.air-scan-missing small{
+  width:100%;
+  color:#92400e;
+}
+
+@media (max-width:700px){
+  .air-scan-panel{
+    margin:14px 0 18px;
+    padding:12px;
+    border-radius:15px;
+  }
+  .air-scan-head{
+    align-items:center;
+  }
+  .air-scan-head h4{
+    font-size:19px;
+  }
+  .air-scan-head p{
+    font-size:12px;
+  }
+  .air-scan-total{
+    min-width:72px;
+    padding:9px 8px;
+  }
+  .air-scan-total strong{
+    font-size:24px;
+  }
+  .air-scan-card{
+    padding:11px;
+  }
+  .air-scan-product{
+    align-items:flex-start;
+  }
+  .air-scan-product strong{
+    font-size:15px;
+  }
+  .air-scan-qty{
+    min-width:78px;
+  }
+  .air-scan-qty strong{
+    font-size:21px;
+  }
+  .air-barcode-wrap{
+    padding:6px;
+  }
+}
