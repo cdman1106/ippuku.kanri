@@ -8,6 +8,43 @@ const DRINK_CATEGORIES = new Set(["Café","Relax","Refresh"]);
 const APP_STATE_KEYS = new Set(["sales","inventory","reserves","promos"]);
 const BRIDGE_TOKEN_SHA256 = "1b080489510b2ee4fdfb387e120e4bc2ff0bcc16745f293e909df8f69265222b";
 
+// お客様端末から送られる価格・カテゴリは信用しない。
+// 注文確定時は必ずこのサーバー側マスターで再計算する。
+const ORDER_MENU = {
+  "紅茶/アイスティー": {category:"Relax", price:550, option:"HOT_ICE"},
+  "ミルクティー": {category:"Relax", price:580, option:"HOT_ICE"},
+  "抹茶ラテ": {category:"Relax", price:660, option:"HOT_ICE"},
+  "ルイボスティー": {category:"Relax", price:550, option:"HOT_ICE"},
+  "ゆず蜜": {category:"Relax", price:650, option:"YUZU"},
+
+  "コーヒー": {category:"Café", price:550, option:"HOT_ICE"},
+  "カフェラテ": {category:"Café", price:580, option:"HOT_ICE"},
+  "ウィンナーコーヒー": {category:"Café", price:650, option:"HOT_ICE"},
+  "キャラメルマキアート": {category:"Café", price:660, option:"HOT_ICE"},
+  "ホワイトモカ": {category:"Café", price:660, option:"HOT_FIXED"},
+  "カフェ・モカ": {category:"Café", price:660, option:"HOT_ICE"},
+  "チョコチーノ": {category:"Café", price:660, option:"HOT_ICE"},
+
+  "コーラ": {category:"Refresh", price:550, option:"NONE"},
+  "みかんジュース": {category:"Refresh", price:560, option:"NONE"},
+  "青森りんご100%/炭酸": {category:"Refresh", price:650, option:"NONE"},
+  "ペリエ": {category:"Refresh", price:580, option:"NONE"},
+  "モンスター": {category:"Refresh", price:580, option:"NONE"},
+
+  "ポパイサンド": {category:"Food", price:550, option:"NONE"},
+  "あんバターサンド": {category:"Food", price:500, option:"NONE"},
+  "チーズケーキ": {category:"Dessert", price:330, option:"NONE"},
+  "コーヒーゼリーパフェ": {category:"Dessert", price:550, option:"NONE"},
+  "コーヒーゼリー": {category:"Dessert", price:330, option:"NONE"},
+  "こんがりワッフル": {category:"Dessert", price:440, option:"WAFFLE"},
+  "濃厚バニラアイス": {category:"Dessert", price:380, option:"VANILLA"},
+
+  "ナッツ": {category:"Snack", price:220, option:"NONE"},
+
+  "ZIPPOガチャ": {category:"Gacha", price:5000, option:"NONE", nightFeeExempt:true},
+  "The Cling Lighter ガチャ": {category:"Lighter", price:10000, option:"NONE", nightFeeExempt:true}
+};
+
 // Airレジ商品一括編集CSV（2026-09-21）から、現在のモバイルオーダー掲載商品だけを抽出。
 // バーコード先頭の # はCSV表示用なので、Airレジ検索へ送る値では外す。
 const AIR_BUILTIN_MAP = {
@@ -111,14 +148,53 @@ function isNightChargeTimeJst(date = new Date()) {
   return false;
 }
 
-function normalizeItem(item) {
+function validMenuOption(rule, option) {
+  const text = String(option || "").trim();
+  if (rule === "NONE") return text === "";
+  if (rule === "HOT_FIXED") return text === "HOT";
+  if (rule === "HOT_ICE") {
+    return /(?:^|\/ )温度: (?:HOT|ICE)(?:$| \/)/.test(text) ||
+           /(?:^|\s)温度: (?:HOT|ICE)(?:$|\s|\/)/.test(text);
+  }
+  if (rule === "YUZU") {
+    return /^割り方: (水割り|お湯割り|炭酸割り)$/.test(text);
+  }
+  if (rule === "WAFFLE") {
+    return /^ソース: (チョコ|キャラメル|ベリー)$/.test(text);
+  }
+  if (rule === "VANILLA") {
+    return text === "盛り方: シングル" ||
+      text === "盛り方: ダブル（2個盛り・30円引き）";
+  }
+  return false;
+}
+
+function normalizeOrderItem(item) {
+  const name = String(item?.name || "").trim().slice(0, 120);
+  const master = ORDER_MENU[name];
+  if (!master) return null;
+
+  const option = String(item?.option || "").trim().slice(0, 240);
+  if (!validMenuOption(master.option, option)) return null;
+
+  const qtyRaw = Number(item?.qty || 1);
+  if (!Number.isFinite(qtyRaw)) return null;
+  const qty = Math.max(1, Math.min(20, Math.round(qtyRaw)));
+
+  let price = Number(master.price || 0);
+  if (name === "濃厚バニラアイス" &&
+      option === "盛り方: ダブル（2個盛り・30円引き）") {
+    price = 730;
+  }
+
   return {
-    name: String(item?.name || "").slice(0, 120),
-    displayName: String(item?.displayName || item?.name || "").slice(0, 240),
-    category: String(item?.category || "").slice(0, 80),
-    price: Math.max(0, Math.round(Number(item?.price || 0))),
-    qty: Math.max(1, Math.min(99, Math.round(Number(item?.qty || 1)))),
-    option: String(item?.option || "").slice(0, 240)
+    name,
+    displayName: name + (option ? " / " + option : ""),
+    category: master.category,
+    price,
+    qty,
+    option,
+    nightFeeExempt: master.nightFeeExempt === true
   };
 }
 
@@ -454,10 +530,18 @@ async function createOrder(request, env) {
   const access = await getSeatAccess(env, seat);
   if (!access.open) return json({ ok: false, error: "SEAT_CLOSED" }, 403);
 
-  const items = Array.isArray(body.items)
-    ? body.items.map(normalizeItem).filter((x) => x.name && x.category !== "Fee")
-    : [];
-  if (!items.length || items.length > 50) return json({ ok: false, error: "INVALID_ITEMS" }, 400);
+  const rawItems = Array.isArray(body.items) ? body.items : [];
+  if (!rawItems.length || rawItems.length > 50) {
+    return json({ ok: false, error: "INVALID_ITEMS" }, 400);
+  }
+  const items = rawItems.map(normalizeOrderItem);
+  if (items.some((x) => !x)) {
+    return json({
+      ok: false,
+      error: "INVALID_MENU_ITEM",
+      message: "商品・オプション・価格情報が現在のメニューと一致しません。画面を更新して再度お試しください。"
+    }, 400);
+  }
 
   const drinkSatisfied =
     hasDrinkInItems(items) ||
@@ -476,7 +560,7 @@ async function createOrder(request, env) {
   const note = String(body.note || "").slice(0, 500);
   const subtotal = items.reduce((sum, x) => sum + x.price * x.qty, 0);
   const nightFeeBase = items.reduce((sum, x) => {
-    if (x.name === "ZIPPOガチャ" || x.name === "The Cling Lighter ガチャ") return sum;
+    if (x.nightFeeExempt === true) return sum;
     return sum + x.price * x.qty;
   }, 0);
   const nightFee = isNightChargeTimeJst(nowDate) ? Math.round(nightFeeBase * 0.10) : 0;
