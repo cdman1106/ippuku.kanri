@@ -688,6 +688,17 @@ async function startBridgeSession(request, env) {
   return json({ ok: true, device, sessionStartedAt: now, existing: false });
 }
 
+async function resetBridgeSession(request, env) {
+  await ensureOrdersTables(env);
+  const body = await request.json().catch(() => ({}));
+  const device = String(body?.device || "galaxy").trim().slice(0, 80) || "galaxy";
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO bridge_devices (device, session_started_at, updated_at) VALUES (?, ?, ?) ON CONFLICT(device) DO UPDATE SET session_started_at = excluded.session_started_at, updated_at = excluded.updated_at"
+  ).bind(device, now, now).run();
+  return json({ ok: true, device, sessionStartedAt: now, reset: true });
+}
+
 async function getBridgeSessionStart(env, device) {
   const row = await env.DB.prepare(
     "SELECT session_started_at FROM bridge_devices WHERE device = ?"
@@ -977,6 +988,9 @@ async function handleApi(request, env) {
 
   if (url.pathname === "/api/bridge/session/start" && request.method === "POST") {
     return startBridgeSession(request, env);
+  }
+  if (url.pathname === "/api/bridge/session/reset" && request.method === "POST") {
+    return resetBridgeSession(request, env);
   }
   if (url.pathname === "/api/bridge/recovery" && request.method === "GET") {
     return bridgeRecoveryStatus(env);
