@@ -11,21 +11,33 @@
   function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
 
   var KEY='ippukuProcurementV1';
-  var state=load(KEY,{master:[],inventory:[],sales:[],manual:[],supplierSettings:{},overrides:{},orders:[],settings:{salesDays:60,targetDays:45,shortageRisk:5,nextJtRegularDate:'',bridgeUrl:'http://127.0.0.1:8765'}});
+  var state=load(KEY,{master:[],inventory:[],sales:[],manual:[],supplierSettings:{},overrides:{},orders:[],salesSignals:{},settings:{salesDays:60,orderCycleDays:7,safetyDays:7,defaultLeadDays:2,maxForwardDays:21,freeBufferPct:10,shortageRisk:5,nextJtRegularDate:'',bridgeUrl:'http://127.0.0.1:8765'}});
   if(!state.settings)state.settings={};
   if(!state.manual)state.manual=[];
   if(!state.overrides)state.overrides={};
   if(!state.orders)state.orders=[];
+  if(!state.salesSignals)state.salesSignals={};
+  if(!state.settings.salesDays)state.settings.salesDays=60;
+  if(!state.settings.orderCycleDays)state.settings.orderCycleDays=7;
+  if(!state.settings.safetyDays)state.settings.safetyDays=7;
+  if(!state.settings.defaultLeadDays)state.settings.defaultLeadDays=2;
+  if(!state.settings.maxForwardDays)state.settings.maxForwardDays=21;
+  if(state.settings.freeBufferPct==null)state.settings.freeBufferPct=10;
+  if(!state.weeklyPlannerV2){
+    Object.keys(state.overrides||{}).forEach(function(k){delete state.overrides[k].qty;delete state.overrides[k].autoExtra;delete state.overrides[k].manualQty});
+    state.weeklyPlannerV2=true;
+    save(KEY,state);
+  }
 
   var SUPPLIERS=[
-    {id:'TS',name:'TSネットワーク',codes:['JT','TS'],free:30000,min:0,basis:'下代',shipping:0,cutoff:'平日12:00',delivery:'原則翌々日',method:'Web / 指定発注',payment:'取引条件による',fax:'',samples:false,tsFallback:false,note:'混合注文は30,000円以上で送料無料。JTは別倉庫・別ルール。'},
-    {id:'AY',name:'秋山産業',codes:['AY','AK'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-5434-2050',samples:true,tsFallback:true,note:'直接発注とTS混合の比較対象。送料無料条件は実際の取引条件を設定してください。'},
-    {id:'TG',name:'柘製作所',codes:['TG'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-3845-1225',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。喫煙具は原則直接。'},
-    {id:'HY',name:'春山商事',codes:['HY'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-3832-1486',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。喫煙具は原則直接。'},
-    {id:'IC',name:'インターコンチネンタル商事',codes:['IC'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX / メール',payment:'',fax:'03-3586-6716',samples:false,tsFallback:true,note:'TS代替可否は商品ごとに最終確認。'},
-    {id:'IM',name:'日本たばこアイメックス',codes:['IM'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / FAX',payment:'',fax:'',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。'},
-    {id:'MS',name:'モリソン商会',codes:['MS'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / FAX',payment:'',fax:'03-5828-5912',samples:false,tsFallback:false,note:'RAW等。取引条件を設定してください。'},
-    {id:'SM',name:'Smith Corporation / ロックリンク合同会社',codes:['SM'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / 要確認',payment:'',fax:'',samples:false,tsFallback:false,note:'TSUTSUMI、パピヨン、コピ、バイオリン、バージンロイヤル等。FAX可否は未確認。'}
+    {id:'TS',name:'TSネットワーク',codes:['JT','TS'],free:30000,min:0,leadDays:2,basis:'下代',shipping:0,cutoff:'平日12:00',delivery:'原則翌々日',method:'Web / 指定発注',payment:'取引条件による',fax:'',samples:false,tsFallback:false,note:'混合注文は30,000円以上で送料無料。JTは別倉庫・別ルール。'},
+    {id:'AY',name:'秋山産業',codes:['AY','AK'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-5434-2050',samples:true,tsFallback:true,note:'直接発注とTS混合の比較対象。送料無料条件は実際の取引条件を設定してください。'},
+    {id:'TG',name:'柘製作所',codes:['TG'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-3845-1225',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。喫煙具は原則直接。'},
+    {id:'HY',name:'春山商事',codes:['HY'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-3832-1486',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。喫煙具は原則直接。'},
+    {id:'IC',name:'インターコンチネンタル商事',codes:['IC'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX / メール',payment:'',fax:'03-3586-6716',samples:false,tsFallback:true,note:'TS代替可否は商品ごとに最終確認。'},
+    {id:'IM',name:'日本たばこアイメックス',codes:['IM'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / FAX',payment:'',fax:'',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。'},
+    {id:'MS',name:'モリソン商会',codes:['MS'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / FAX',payment:'',fax:'03-5828-5912',samples:false,tsFallback:false,note:'RAW等。取引条件を設定してください。'},
+    {id:'SM',name:'Smith Corporation / ロックリンク合同会社',codes:['SM'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / 要確認',payment:'',fax:'',samples:false,tsFallback:false,note:'TSUTSUMI、パピヨン、コピ、バイオリン、バージンロイヤル等。FAX可否は未確認。'}
   ];
   var CODE_MAP={};
   SUPPLIERS.forEach(function(s){s.codes.forEach(function(c){CODE_MAP[c]=s.id})});
@@ -125,6 +137,25 @@
     });
     return Object.keys(map).map(function(k){return map[k]});
   }
+  function updateSalesSignals(previous,next){
+    var prev=indexById(previous||[]),now=Date.now(),last=Number(state.lastSalesImportAt||0);
+    var elapsedDays=last?Math.max(1,Math.min(30,(now-last)/86400000)):7;
+    var existing=state.salesSignals||{},signals={};
+    (next||[]).forEach(function(x){
+      if(!x.id)return;
+      var key='id:'+String(x.id).trim(),before=prev[key],oldQty=before?num(before.qty):0,newQty=num(x.qty),prior=existing[key]||null;
+      if(before&&newQty===oldQty&&prior&&Number(prior.expiresAt||0)>now){signals[key]=prior;return}
+      var delta=Math.max(0,newQty-oldQty),base=newQty/Math.max(1,num(state.settings.salesDays,60)),boost=delta>0?delta/elapsedDays:0;
+      var revived=!!before&&oldQty<=0&&newQty>0;
+      var surged=!revived&&delta>=2&&boost>base*1.5;
+      if(revived||surged){
+        signals[key]={revived:revived,surged:surged,previousQty:oldQty,currentQty:newQty,delta:delta,boostDaily:Math.max(base,boost),detectedAt:now,expiresAt:now+14*86400000};
+      }
+    });
+    state.salesSignals=signals;
+    state.lastSalesImportAt=now;
+  }
+
   function keyOf(x){
     if(x&&x.id)return 'id:'+String(x.id).trim();
     return 'n:'+norm(x&&x.name);
@@ -165,7 +196,7 @@
   }
 
   function buildRows(){
-    var inv=indexById(state.inventory),sales=indexById(state.sales),salesDays=Math.max(1,num(state.settings.salesDays,60)),targetDays=Math.max(1,num(state.settings.targetDays,45)),out=[];
+    var inv=indexById(state.inventory),sales=indexById(state.sales),salesDays=Math.max(1,num(state.settings.salesDays,60)),out=[];
     var masterById={};
 
     (state.master||[]).forEach(function(p){
@@ -210,22 +241,26 @@
       var salesMatched=!!si,inventoryMatched=!!ii;
       si=si||{};ii=ii||{};
 
-      var supplier=supplierFor(p),ov=state.overrides[k]||{};
-      var sold=num(si.qty),stock=num(ii.stock);
-      var forecast=sold*(targetDays/salesDays);
+      var supplier=supplierFor(p),ov=state.overrides[k]||{},cfg=supplierCfg(supplier);
+      var sold=num(si.qty),stock=num(ii.stock),baseDaily=sold/salesDays,signal=(state.salesSignals||{})[k]||null,signalActive=signal&&Number(signal.expiresAt||0)>Date.now();
+      var daily=signalActive?Math.max(baseDaily,num(signal.boostDaily)):baseDaily;
+      var cycleDays=Math.max(1,num(state.settings.orderCycleDays,7)),leadDays=Math.max(0,num(cfg.leadDays,state.settings.defaultLeadDays||2)),safetyDays=Math.max(0,num(state.settings.safetyDays,7));
+      var coverDays=cycleDays+leadDays+safetyDays;
+      var forecast=daily*coverDays;
       var need=Math.max(0,forecast-stock);
       var step=Math.max(1,num(ov.pack,1));
       var noRecentSales=sold<=0;
       var recommended=!noRecentSales&&inventoryMatched&&need>0?Math.ceil(need/step)*step:0;
-      var fill=forecast>0?stock/forecast:999,daily=sold/salesDays;
-      var qty=noRecentSales?0:Math.max(0,num(ov.qty,recommended));
+      var fill=forecast>0?stock/forecast:999;
+      var autoExtra=Math.max(0,num(ov.autoExtra,0));
+      var qty=noRecentSales?0:(ov.manualQty!=null?Math.max(0,num(ov.manualQty)):recommended+autoExtra);
       var isJT=String(p.note||'').trim()==='JT';
 
       out.push({
         key:k,id:id,name:p.name,barcode:p.barcode,barcodes:p.barcodes,category:p.category,
         cost:num(p.cost),price:num(p.price),note:p.note,supplier:supplier,
         sold:sold,stock:stock,forecast:forecast,need:need,fill:fill,daily:daily,
-        pack:step,recommended:recommended,qty:qty,noRecentSales:noRecentSales,
+        pack:step,recommended:recommended,qty:qty,noRecentSales:noRecentSales,baseDaily:baseDaily,effectiveDaily:daily,coverDays:coverDays,revived:!!(signalActive&&signal.revived),surged:!!(signalActive&&signal.surged),
         inventoryMatched:inventoryMatched,salesMatched:salesMatched,
         sourceRows:p.sourceRows,inventoryRows:num(ii.rows,inventoryMatched?1:0),
         tsEligible:defaultTsEligible(p,supplier),route:ov.route||'',isJT:isJT,newProduct:false
@@ -234,7 +269,7 @@
 
     (state.manual||[]).forEach(function(p){
       var k='manual:'+p.uid,ov=state.overrides[k]||{},qty=Math.max(0,num(ov.qty,p.initialQty||1)),step=Math.max(1,num(ov.pack,p.pack||1));
-      out.push({key:k,id:p.id||'',name:p.name,barcode:p.barcode||'',barcodes:p.barcode?[p.barcode]:[],category:p.category||'新商品',cost:num(p.cost),price:num(p.price),note:'NEW',supplier:p.supplier||'',sold:0,stock:0,forecast:0,need:qty,fill:0,daily:0,pack:step,recommended:qty,qty:qty,noRecentSales:false,inventoryMatched:false,salesMatched:false,sourceRows:1,inventoryRows:0,tsEligible:!!p.tsEligible,route:ov.route||'',isJT:false,newProduct:true});
+      out.push({key:k,id:p.id||'',name:p.name,barcode:p.barcode||'',barcodes:p.barcode?[p.barcode]:[],category:p.category||'新商品',cost:num(p.cost),price:num(p.price),note:'NEW',supplier:p.supplier||'',sold:0,stock:0,forecast:0,need:qty,fill:0,daily:0,pack:step,recommended:qty,qty:qty,noRecentSales:false,baseDaily:0,effectiveDaily:0,coverDays:0,revived:false,surged:false,inventoryMatched:false,salesMatched:false,sourceRows:1,inventoryRows:0,tsEligible:!!p.tsEligible,route:ov.route||'',isJT:false,newProduct:true});
     });
 
     out.sort(function(a,b){
@@ -257,21 +292,72 @@
     }
     return 'direct';
   }
+  function candidateBelongsToGroup(r,id){
+    if(r.newProduct||r.noRecentSales||!r.inventoryMatched||r.qty<0)return false;
+    if(id==='TS_MIXED')return r.tsEligible&&routeOf(r)==='ts_mixed';
+    if(id.indexOf('DIRECT_')===0)return r.supplier===id.replace('DIRECT_','')&&routeOf(r)==='direct';
+    return false;
+  }
+  function topUpGroupToFreeShipping(rows,id){
+    var threshold=thresholdForGroup(id);
+    if(threshold<=0)return;
+    var supplier=groupSupplier(id),cfg=supplierCfg(supplier),buffer=Math.max(0,num(state.settings.freeBufferPct,10))/100,target=threshold*(1+buffer),maxDays=Math.max(7,num(state.settings.maxForwardDays,21));
+    var groupRows=rows.filter(function(r){return r.qty>0&&groupId(r)===id});
+    var subtotal=thresholdSubtotal(groupRows,cfg);
+    if(subtotal>=target)return;
+    var candidates=rows.filter(function(r){
+      if(!candidateBelongsToGroup(r,id))return false;
+      var ov=state.overrides[r.key]||{};
+      if(ov.manualQty!=null)return false;
+      return r.effectiveDaily>0&&r.cost>0;
+    }).sort(function(a,b){
+      var ac=a.effectiveDaily>0?a.stock/a.effectiveDaily:999,bc=b.effectiveDaily>0?b.stock/b.effectiveDaily:999;
+      if(ac!==bc)return ac-bc;
+      return b.effectiveDaily-a.effectiveDaily;
+    });
+    var guard=0;
+    while(subtotal<target&&guard<5000){
+      guard++;
+      var changed=false;
+      for(var i=0;i<candidates.length&&subtotal<target;i++){
+        var r=candidates[i],ov=state.overrides[r.key]||{},currentQty=r.recommended+Math.max(0,num(ov.autoExtra,0)),maxStock=r.effectiveDaily*maxDays,maxQty=Math.max(0,Math.floor(maxStock-r.stock));
+        var step=Math.max(1,r.pack),allowed=Math.floor(maxQty/step)*step;
+        if(currentQty+step>allowed)continue;
+        ov.autoExtra=Math.max(0,num(ov.autoExtra,0))+step;
+        state.overrides[r.key]=ov;
+        r.qty+=step;
+        subtotal+=step*(String(cfg.basis||'')==='上代'?num(r.price):num(r.cost));
+        changed=true;
+      }
+      if(!changed)break;
+    }
+  }
   function applyAutoPlan(rows){
+    Object.keys(state.overrides||{}).forEach(function(k){delete state.overrides[k].autoExtra});
+    rows=buildRows();
     rows.forEach(function(r){
       var k=r.key,ov=state.overrides[k]||{};
       if(ov.routeLocked)return;
       var route=suggestedRoute(r);
       if(route==='direct'&&r.tsEligible){
         var cfg=supplierCfg(r.supplier);
-        var supplierItems=rows.filter(function(x){return x.supplier===r.supplier&&x.qty>0&&!x.isJT});
+        var supplierItems=rows.filter(function(x){return x.supplier===r.supplier&&x.recommended>0&&!x.isJT});
         var supplierTotal=thresholdSubtotal(supplierItems,cfg);
         if(cfg.free>0&&supplierTotal<cfg.free)route='ts_mixed';
       }
       state.overrides[k]=Object.assign({},ov,{route:route});
     });
+    rows=buildRows();
+    var candidateGroups={};
+    rows.forEach(function(r){
+      if(r.noRecentSales||r.newProduct)return;
+      var id=groupId(r);
+      if(id==='TS_MIXED'||id.indexOf('DIRECT_')===0)candidateGroups[id]=true;
+    });
+    Object.keys(candidateGroups).forEach(function(id){topUpGroupToFreeShipping(rows,id)});
     persist();
   }
+
   function routeOf(r){return (state.overrides[r.key]||{}).route||suggestedRoute(r)}
   function groupId(r){var route=routeOf(r);if(route==='ts_mixed')return 'TS_MIXED';if(route==='jt_regular')return 'JT_REGULAR';if(route==='jt_normal')return 'JT_NORMAL';if(route==='hold')return 'HOLD';return 'DIRECT_'+(r.supplier||'UNKNOWN')}
   function groupName(id){if(id==='TS_MIXED')return 'TSネットワーク混合';if(id==='JT_REGULAR')return 'JT 定期配送待ち';if(id==='JT_NORMAL')return 'JT 通常発注';if(id==='HOLD')return '今回見送り';if(id.indexOf('DIRECT_')===0)return supplierCfg(id.replace('DIRECT_','')).name+' 直接';return id}
@@ -284,7 +370,7 @@
     return items.reduce(function(a,r){return a+r.qty*(useRetail?num(r.price):num(r.cost))},0);
   }
   function groupStats(id,items){
-    var supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):{},total=items.reduce(function(a,r){return a+r.qty*r.cost},0),thresholdAmount=thresholdSubtotal(items,cfg),threshold=thresholdForGroup(id),minimum=num(cfg.min),risk=Math.max(0,Math.min(100,num(state.settings.shortageRisk,5)))/100,riskAdjusted=thresholdAmount*(1-risk);
+    var supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):{},total=items.reduce(function(a,r){return a+r.qty*r.cost},0),thresholdAmount=thresholdSubtotal(items,cfg),threshold=thresholdForGroup(id),minimum=num(cfg.min),risk=Math.max(0,Math.min(100,num(state.settings.shortageRisk,5)))/100,riskAdjusted=thresholdAmount*(1-risk),bufferPct=Math.max(0,num(state.settings.freeBufferPct,10)),bufferTarget=threshold*(1+bufferPct/100);
     var basisLabel=cfg.basis?(' / '+cfg.basis+'基準'):'',status='条件未設定';
     if(id==='JT_REGULAR')status='定期配送なら送料無料';
     else if(id==='JT_NORMAL')status='通常送料あり';
@@ -293,7 +379,7 @@
     else if(threshold>0){
       if(thresholdAmount<threshold)status='送料無料まで '+yen(threshold-thresholdAmount)+' 不足'+basisLabel+(num(cfg.shipping)>0?' / 送料'+yen(cfg.shipping):'');
       else if(riskAdjusted<threshold)status='欠品'+Math.round(risk*100)+'%で送料無料割れリスク'+basisLabel;
-      else status='送料無料ライン +'+yen(thresholdAmount-threshold)+'余裕'+basisLabel;
+      else if(thresholdAmount<bufferTarget)status='送料無料達成 / 余白目標まで '+yen(bufferTarget-thresholdAmount)+basisLabel;else status='送料無料 +'+bufferPct+'%余白確保'+basisLabel;
     }else if(num(cfg.shipping)>0)status='通常送料 '+yen(cfg.shipping);
     return {total:total,thresholdAmount:thresholdAmount,threshold:threshold,riskAdjusted:riskAdjusted,status:status};
   }
@@ -315,7 +401,7 @@
         '<article><span>商品台帳</span><strong>'+loaded.master.toLocaleString()+'</strong><small>同一商品IDは1商品に統合</small></article>'+
         '<article><span>在庫CSV照合</span><strong>'+inventoryMatchedCount.toLocaleString()+'</strong><small>'+(inventoryUnmatchedCount?'未照合 '+inventoryUnmatchedCount+'件':'照合済み')+'</small></article>'+
         '<article><span>発注案総額</span><strong>'+yen(totalNeed)+'</strong><small>選択中</small></article>'+
-        '<article><span>予測期間</span><strong>'+esc(state.settings.targetDays||45)+'日</strong><small>売上'+esc(state.settings.salesDays||60)+'日基準</small></article>'+
+        '<article><span>発注サイクル</span><strong>'+esc(state.settings.orderCycleDays||7)+'日</strong><small>週1補充 / 安全在庫 '+esc(state.settings.safetyDays||7)+'日</small></article>'+
       '</div>'+csvPanel()+settingsPanel()+summaryPanel(rows)+productPanel(rows)+historyPanel();
     bind(root,rows);
   }
@@ -331,7 +417,7 @@
     var st=state.settings;
     return '<details class="panel proc-block proc-settings"><summary><strong>② 発注条件・仕入先設定</strong><span>不足率 / 送料無料 / 送料 / 締切 / 支払 / FAX / JT定期便</span></summary>'+
       '<div class="proc-settings-grid">'+
-        field('販売実績日数','procSalesDays',st.salesDays||60,'number')+field('在庫確保日数','procTargetDays',st.targetDays||45,'number')+field('欠品想定率（%）','procRisk',st.shortageRisk||5,'number')+field('次回JT定期配送日','procJtDate',st.nextJtRegularDate||'','date')+field('Mac FAX Bridge','procBridgeUrl',st.bridgeUrl||'http://127.0.0.1:8765','text')+
+        field('販売実績日数','procSalesDays',st.salesDays||60,'number')+field('発注間隔（日）','procCycleDays',st.orderCycleDays||7,'number')+field('安全在庫（日）','procSafetyDays',st.safetyDays||7,'number')+field('標準リード日数','procLeadDays',st.defaultLeadDays||2,'number')+field('前倒し上限（日）','procForwardDays',st.maxForwardDays||21,'number')+field('送料無料余白（%）','procFreeBuffer',st.freeBufferPct==null?10:st.freeBufferPct,'number')+field('欠品想定率（%）','procRisk',st.shortageRisk||5,'number')+field('次回JT定期配送日','procJtDate',st.nextJtRegularDate||'','date')+field('Mac FAX Bridge','procBridgeUrl',st.bridgeUrl||'http://127.0.0.1:8765','text')+
       '</div><div class="proc-supplier-settings">'+SUPPLIERS.map(function(x){var c=supplierCfg(x.id);return '<div class="proc-supplier-setting"><div class="proc-supplier-main"><strong>'+esc(c.name)+'</strong><small>'+esc(c.note||'')+'</small></div><label>送料無料ライン<input type="number" data-supplier-free="'+x.id+'" value="'+esc(c.free||'')+'" placeholder="未設定"></label><label>最低発注<input type="number" data-supplier-min="'+x.id+'" value="'+esc(c.min||'')+'"></label><label>通常送料<input type="number" data-supplier-shipping="'+x.id+'" value="'+esc(c.shipping||'')+'"></label><label>判定基準<select data-supplier-basis="'+x.id+'"><option value="" '+(!c.basis?'selected':'')+'>未設定</option><option value="下代" '+(c.basis==='下代'?'selected':'')+'>下代</option><option value="上代" '+(c.basis==='上代'?'selected':'')+'>上代</option></select></label><label>発注締切<input data-supplier-cutoff="'+x.id+'" value="'+esc(c.cutoff||'')+'" placeholder="例 12:00"></label><label>配送目安<input data-supplier-delivery="'+x.id+'" value="'+esc(c.delivery||'')+'" placeholder="例 翌々日"></label><label>注文方法<input data-supplier-method="'+x.id+'" value="'+esc(c.method||'')+'"></label><label>支払方法<input data-supplier-payment="'+x.id+'" value="'+esc(c.payment||'')+'"></label><label>FAX<input data-supplier-fax="'+x.id+'" value="'+esc(c.fax||'')+'" placeholder="未設定"></label><label class="proc-checkline"><input type="checkbox" data-supplier-samples="'+x.id+'" '+(c.samples?'checked':'')+'><span>サンプル期待</span></label><label class="proc-checkline"><input type="checkbox" data-supplier-ts="'+x.id+'" '+(c.tsFallback?'checked':'')+'><span>たばこはTS代替候補</span></label></div>'}).join('')+'</div><div class="proc-actions"><button class="primary-btn" id="procSaveSettings">設定を保存</button></div></details>';
   }
   function field(label,id,value,type){return '<label><span>'+esc(label)+'</span><input id="'+id+'" type="'+type+'" value="'+esc(value)+'"></label>'}
@@ -349,7 +435,7 @@
 
   function productPanel(rows){
     var suppliers=['all'].concat(SUPPLIERS.map(function(sp){return sp.id}),['UNKNOWN']);
-    return '<section class="panel proc-block"><div class="panel-head"><div><h3>④ 商品別 発注優先順位</h3><p>商品ID単位で集計。推奨数 = max(0, 過去'+esc(state.settings.salesDays||60)+'日販売 × '+esc(state.settings.targetDays||45)+'/'+esc(state.settings.salesDays||60)+' − 現在庫)。</p></div><input id="procSearch" class="search" placeholder="商品名・商品IDで検索"></div><div class="proc-filters">'+suppliers.map(function(id){return '<button class="filter '+(id==='all'?'active':'')+'" data-proc-supplier-filter="'+id+'">'+(id==='all'?'すべて':id==='UNKNOWN'?'未判定':esc(supplierCfg(id).name))+'</button>'}).join('')+'</div><div class="table-scroll proc-table-wrap"><table class="proc-table"><thead><tr><th>優先</th><th>商品</th><th>商品ID</th><th>仕入先</th><th>'+esc(state.settings.salesDays||60)+'日販売</th><th>在庫</th><th>'+esc(state.settings.targetDays||45)+'日予測</th><th>充足率</th><th>発注刻み</th><th>推奨</th><th>発注数</th><th>発注先</th><th>金額</th></tr></thead><tbody id="procTableBody">'+productRows(rows)+'</tbody></table></div></section>';
+    return '<section class="panel proc-block"><div class="panel-head"><div><h3>④ 商品別 発注優先順位</h3><p>商品ID単位。週1発注で、リード日数＋次回発注まで＋安全在庫を確保し、送料無料不足分だけ近いうち売れる商品を前倒しします。</p></div><input id="procSearch" class="search" placeholder="商品名・商品IDで検索"></div><div class="proc-filters">'+suppliers.map(function(id){return '<button class="filter '+(id==='all'?'active':'')+'" data-proc-supplier-filter="'+id+'">'+(id==='all'?'すべて':id==='UNKNOWN'?'未判定':esc(supplierCfg(id).name))+'</button>'}).join('')+'</div><div class="table-scroll proc-table-wrap"><table class="proc-table"><thead><tr><th>優先</th><th>商品</th><th>商品ID</th><th>仕入先</th><th>'+esc(state.settings.salesDays||60)+'日販売</th><th>在庫</th><th>必要在庫</th><th>充足率</th><th>発注刻み</th><th>推奨</th><th>発注数</th><th>発注先</th><th>金額</th></tr></thead><tbody id="procTableBody">'+productRows(rows)+'</tbody></table></div></section>';
   }
   function productRows(rows,filter,search){
     filter=filter||'all';search=norm(search||'');
@@ -366,8 +452,8 @@
       routes.push(['hold','見送り']);
       var stockText=((state.inventory||[]).length&&!r.inventoryMatched&&!r.newProduct)?'<span class="proc-unmatched">未照合</span>':r.stock.toFixed(1);
       var salesText=((state.sales||[]).length&&!r.salesMatched&&!r.newProduct)?'<span class="proc-unmatched">未照合</span>':r.sold.toFixed(0);
-      var noSalesNote=r.noRecentSales&&!r.newProduct?'<small class="proc-nosales">過去2カ月販売0 → 発注しない</small>':'';var mergeNote=r.sourceRows>1?'<small>商品台帳 '+r.sourceRows+'行を商品IDで統合</small>':'';var invMergeNote=r.inventoryRows>1?'<small>在庫 '+r.inventoryRows+'行を合計</small>':'';
-      return '<tr data-proc-row="'+esc(r.key)+'"><td><span class="proc-priority p-'+urgent+'">'+urgent+'</span></td><td><strong>'+esc(r.name)+'</strong><small>'+esc(r.barcode||'JANなし')+(r.newProduct?' / 新規':'')+'</small>'+noSalesNote+mergeNote+invMergeNote+'</td><td><code>'+esc(r.id||'未登録')+'</code></td><td>'+esc(r.supplier?supplierCfg(r.supplier).name:'未判定')+(r.tsEligible?'<small>TS代替候補</small>':'')+'</td><td>'+salesText+'</td><td>'+stockText+'</td><td>'+r.forecast.toFixed(1)+'</td><td><b>'+rate+'</b></td><td><input class="proc-mini" type="number" min="1" data-proc-pack="'+esc(r.key)+'" value="'+r.pack+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td>'+r.recommended+'</td><td><input class="proc-mini" type="number" min="0" data-proc-qty="'+esc(r.key)+'" value="'+r.qty+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td><select data-proc-route="'+esc(r.key)+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'>'+routes.map(function(x){return '<option value="'+x[0]+'" '+(route===x[0]?'selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></td><td>'+yen(r.qty*r.cost)+'</td></tr>';
+      var noSalesNote=r.noRecentSales&&!r.newProduct?'<small class="proc-nosales">過去2カ月販売0 → 発注しない</small>':'';var signalNote=r.revived?'<small class="proc-revived">復活商品 → 最近の販売速度を優先</small>':(r.surged?'<small class="proc-revived">販売加速 → 最近の販売速度を優先</small>':'');var mergeNote=r.sourceRows>1?'<small>商品台帳 '+r.sourceRows+'行を商品IDで統合</small>':'';var invMergeNote=r.inventoryRows>1?'<small>在庫 '+r.inventoryRows+'行を合計</small>':'';
+      return '<tr data-proc-row="'+esc(r.key)+'"><td><span class="proc-priority p-'+urgent+'">'+urgent+'</span></td><td><strong>'+esc(r.name)+'</strong><small>'+esc(r.barcode||'JANなし')+(r.newProduct?' / 新規':'')+'</small>'+noSalesNote+signalNote+mergeNote+invMergeNote+'</td><td><code>'+esc(r.id||'未登録')+'</code></td><td>'+esc(r.supplier?supplierCfg(r.supplier).name:'未判定')+(r.tsEligible?'<small>TS代替候補</small>':'')+'</td><td>'+salesText+'</td><td>'+stockText+'</td><td>'+r.forecast.toFixed(1)+'</td><td><b>'+rate+'</b></td><td><input class="proc-mini" type="number" min="1" data-proc-pack="'+esc(r.key)+'" value="'+r.pack+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td>'+r.recommended+'</td><td><input class="proc-mini" type="number" min="0" data-proc-qty="'+esc(r.key)+'" value="'+r.qty+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td><select data-proc-route="'+esc(r.key)+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'>'+routes.map(function(x){return '<option value="'+x[0]+'" '+(route===x[0]?'selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></td><td>'+yen(r.qty*r.cost)+'</td></tr>';
     }).join('');
   }
 
@@ -377,12 +463,16 @@
   }
 
   function bind(root,rows){
-    $$('[data-proc-csv]',root).forEach(function(inp){inp.onchange=function(){var file=inp.files&&inp.files[0];if(!file)return;decodeFile(file).then(function(text){var parsed=parseCsvText(text),type=inp.dataset.procCsv;if(type==='master')state.master=parseMaster(parsed);if(type==='inventory')state.inventory=parseInventory(parsed);if(type==='sales')state.sales=parseSales(parsed);persist();applyAutoPlan(buildRows());render()}).catch(function(e){alert('CSV読込に失敗しました: '+e.message)})}});
-    var clear=$('#procClearCsv',root);if(clear)clear.onclick=function(){if(!confirm('読み込んだ3CSVをクリアしますか？新規商品・設定は残します。'))return;state.master=[];state.inventory=[];state.sales=[];state.overrides={};persist();render()};
+    $$('[data-proc-csv]',root).forEach(function(inp){inp.onchange=function(){var file=inp.files&&inp.files[0];if(!file)return;decodeFile(file).then(function(text){var parsed=parseCsvText(text),type=inp.dataset.procCsv;if(type==='master')state.master=parseMaster(parsed);if(type==='inventory')state.inventory=parseInventory(parsed);if(type==='sales'){var nextSales=parseSales(parsed);updateSalesSignals(state.sales,nextSales);state.sales=nextSales}persist();applyAutoPlan(buildRows());render()}).catch(function(e){alert('CSV読込に失敗しました: '+e.message)})}});
+    var clear=$('#procClearCsv',root);if(clear)clear.onclick=function(){if(!confirm('読み込んだ3CSVをクリアしますか？新規商品・設定は残します。'))return;state.master=[];state.inventory=[];state.sales=[];state.salesSignals={};state.lastSalesImportAt=0;state.overrides={};persist();render()};
     var auto=$('#procAutoPlan',root);if(auto)auto.onclick=function(){applyAutoPlan(buildRows());render()};
     var saveBtn=$('#procSaveSettings',root);if(saveBtn)saveBtn.onclick=function(){
       state.settings.salesDays=num($('#procSalesDays',root).value,60);
-      state.settings.targetDays=num($('#procTargetDays',root).value,45);
+      state.settings.orderCycleDays=Math.max(1,num($('#procCycleDays',root).value,7));
+      state.settings.safetyDays=Math.max(0,num($('#procSafetyDays',root).value,7));
+      state.settings.defaultLeadDays=Math.max(0,num($('#procLeadDays',root).value,2));
+      state.settings.maxForwardDays=Math.max(state.settings.orderCycleDays,num($('#procForwardDays',root).value,21));
+      state.settings.freeBufferPct=Math.max(0,num($('#procFreeBuffer',root).value,10));
       state.settings.shortageRisk=num($('#procRisk',root).value,5);
       state.settings.nextJtRegularDate=$('#procJtDate',root).value;
       state.settings.bridgeUrl=$('#procBridgeUrl',root).value.trim()||'http://127.0.0.1:8765';
@@ -391,6 +481,7 @@
           free:num($('[data-supplier-free="'+sp.id+'"]',root).value),
           min:num($('[data-supplier-min="'+sp.id+'"]',root).value),
           shipping:num($('[data-supplier-shipping="'+sp.id+'"]',root).value),
+          leadDays:num($('[data-supplier-lead="'+sp.id+'"]',root).value,state.settings.defaultLeadDays),
           basis:$('[data-supplier-basis="'+sp.id+'"]',root).value,
           cutoff:$('[data-supplier-cutoff="'+sp.id+'"]',root).value.trim(),
           delivery:$('[data-supplier-delivery="'+sp.id+'"]',root).value.trim(),
@@ -416,8 +507,8 @@
     $$('[data-proc-shortage]',root).forEach(function(b){b.onclick=function(){recordShortage(b.dataset.procShortage)}});
   }
   function bindTable(root){
-    $$('[data-proc-qty]',root).forEach(function(i){i.onchange=function(){setOverride(i.dataset.procQty,{qty:Math.max(0,num(i.value))});render()}});
-    $$('[data-proc-pack]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procPack,ov=state.overrides[key]||{};ov.pack=Math.max(1,num(i.value,1));delete ov.qty;state.overrides[key]=ov;persist();render()}});
+    $('[data-proc-qty]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procQty,ov=state.overrides[key]||{};ov.manualQty=Math.max(0,num(i.value));delete ov.autoExtra;state.overrides[key]=ov;persist();render()}});
+    $$('[data-proc-pack]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procPack,ov=state.overrides[key]||{};ov.pack=Math.max(1,num(i.value,1));delete ov.manualQty;delete ov.autoExtra;state.overrides[key]=ov;persist();render()}});
     $$('[data-proc-route]',root).forEach(function(el){el.onchange=function(){setOverride(el.dataset.procRoute,{route:el.value,routeLocked:true});render()}});
   }
 
