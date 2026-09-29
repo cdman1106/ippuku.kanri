@@ -536,7 +536,7 @@
     function redrawTable(){var body=$('#procTableBody',root);if(body){body.innerHTML=productRows(buildRows(),activeFilter,search?search.value:'');bindTable(body)}}
     if(search)search.oninput=redrawTable;
     $$('[data-proc-supplier-filter]',root).forEach(function(b){b.onclick=function(){$$('[data-proc-supplier-filter]',root).forEach(function(x){x.classList.remove('active')});b.classList.add('active');activeFilter=b.dataset.procSupplierFilter;redrawTable()}});
-    $('[data-proc-doc]',root).forEach(function(b){b.onclick=function(){openOrderDocument(b.dataset.procDoc)}});
+    $$('[data-proc-doc]',root).forEach(function(b){b.onclick=function(){openOrderDocument(b.dataset.procDoc)}});
     bindTable(root);
     $$('[data-proc-fax]',root).forEach(function(b){b.onclick=function(){sendFaxGroup(b.dataset.procFax)}});
     $$('[data-proc-sent]',root).forEach(function(b){b.onclick=function(){recordSent(b.dataset.procSent)}});
