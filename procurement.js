@@ -30,15 +30,19 @@
   }
 
   var SUPPLIERS=[
-    {id:'TS',name:'TSネットワーク',codes:['JT','TS'],free:30000,min:0,leadDays:2,basis:'下代',shipping:0,cutoff:'平日12:00',delivery:'原則翌々日',method:'Web / 指定発注',payment:'取引条件による',fax:'',samples:false,tsFallback:false,note:'混合注文は30,000円以上で送料無料。JTは別倉庫・別ルール。'},
-    {id:'AY',name:'秋山産業',codes:['AY','AK'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-5434-2050',samples:true,tsFallback:true,note:'直接発注とTS混合の比較対象。送料無料条件は実際の取引条件を設定してください。'},
-    {id:'TG',name:'柘製作所',codes:['TG'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-3845-1225',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。喫煙具は原則直接。'},
-    {id:'HY',name:'春山商事',codes:['HY'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-3832-1486',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。喫煙具は原則直接。'},
-    {id:'IC',name:'インターコンチネンタル商事',codes:['IC'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX / メール',payment:'',fax:'03-3586-6716',samples:false,tsFallback:true,note:'TS代替可否は商品ごとに最終確認。'},
-    {id:'IM',name:'日本たばこアイメックス',codes:['IM'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / FAX',payment:'',fax:'',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。'},
-    {id:'MS',name:'モリソン商会',codes:['MS'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / FAX',payment:'',fax:'03-5828-5912',samples:false,tsFallback:false,note:'RAW等。取引条件を設定してください。'},
-    {id:'SM',name:'Smith Corporation / ロックリンク合同会社',codes:['SM'],free:0,min:0,leadDays:2,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / 要確認',payment:'',fax:'',samples:false,tsFallback:false,note:'TSUTSUMI、パピヨン、コピ、バイオリン、バージンロイヤル等。FAX可否は未確認。'}
+    {id:'TS',name:'TSネットワーク',codes:['JT','TS'],free:30000,min:0,leadDays:2,basis:'',shipping:0,cutoff:'平日12:00',delivery:'原則翌々日',method:'独自オンライン',payment:'取引条件による',fax:'',samples:false,tsFallback:false,note:'各社混合は30,000円以上で送料無料。JTは別倉庫・別注文。JT通常便は金額にかかわらず送料あり、2週間に1回の金曜定期配送は送料無料。'},
+    {id:'AY',name:'秋山産業',codes:['AY','AK'],free:0,min:25000,leadDays:2,basis:'下代',shipping:0,cutoff:'平日12:00',delivery:'当日発送',method:'FAX',payment:'代金引換',fax:'03-5434-2050',samples:true,tsFallback:true,note:'最低発注は仕入値25,000円以上。直接注文時はサンプル同梱依頼可。'},
+    {id:'TG',name:'柘製作所',codes:['TG'],free:25000,min:0,leadDays:2,basis:'',shipping:1000,cutoff:'平日10:00',delivery:'当日発送 → 原則翌々日着',method:'独自オンライン / FAX',payment:'代金引換',fax:'03-3845-1225',samples:false,tsFallback:true,note:'送料無料25,000円以上。未満は通常送料1,000円。サンプルなし。'},
+    {id:'HY',name:'春山商事',codes:['HY'],free:30000,min:0,leadDays:2,basis:'上代',shipping:0,cutoff:'平日午前中',delivery:'当日出荷',method:'FAX',payment:'後日コンビニ払込票',fax:'',samples:true,tsFallback:true,note:'上代30,000円以上で送料無料。'},
+    {id:'IC',name:'インターコンチネンタル商事',codes:['IC'],free:20000,min:0,leadDays:2,basis:'下代',shipping:0,cutoff:'平日13:00',delivery:'当日出荷',method:'FAX',payment:'代金引換',fax:'03-3586-6716',samples:false,tsFallback:true,note:'仕入値20,000円以上で送料無料。顧客登録済み。'},
+    {id:'IM',name:'日本たばこアイメックス',codes:['IM'],free:0,min:25000,leadDays:2,basis:'',shipping:0,cutoff:'平日12:00',delivery:'当日発送 → 原則翌々日着（要確認）',method:'独自オンライン',payment:'代金引換 / 送料着払い',fax:'',samples:true,tsFallback:true,note:'最低発注25,000円以上。送料は着払い。プライスカードもWebから注文。'},
+    {id:'MS',name:'RAW（モリソン商会）',codes:['MS'],free:25000,min:0,leadDays:2,basis:'上代',shipping:0,cutoff:'',delivery:'',method:'FAX（専用注文用紙）',payment:'代金引換',fax:'03-5828-5912',samples:false,tsFallback:false,note:'通常は上代25,000円以上で送料無料。喫煙具を含む場合は上代20,000円以上。保証期間6カ月。'},
+    {id:'SM',name:'スミス / ロックリンク合同会社',codes:['SM'],free:27274,min:0,leadDays:2,basis:'下代',shipping:0,cutoff:'毎週木曜日 午前中',delivery:'',method:'Eメール',payment:'振込',fax:'',samples:false,tsFallback:false,note:'下代27,274円（税抜）以上で送料無料。毎週木曜日午前中締切。'}
   ];
+  var EXTRA_SUPPLIERS={
+    KK:{id:'KK',name:'広告工房（GANDUM）',free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'Eメール',payment:'振込',fax:'03-5475-6302',samples:false,tsFallback:false,note:'現在事業停止中。再開見込みなし。自動発注対象外。'},
+    MB:{id:'MB',name:'元林',free:20000,min:0,basis:'下代',shipping:800,cutoff:'',delivery:'',method:'Motto Net',payment:'振込',fax:'',samples:false,tsFallback:false,note:'下代20,000円以上で送料無料。通常送料800円。自動発注対象外。'}
+  };
   var CODE_MAP={};
   SUPPLIERS.forEach(function(s){s.codes.forEach(function(c){CODE_MAP[c]=s.id})});
   var MANUAL_SUPPLIER={
@@ -49,9 +53,26 @@
   };
 
   function supplierCfg(id){
-    var base=SUPPLIERS.find(function(s){return s.id===id})||{id:id,name:id,codes:[],free:0,min:0,method:'要確認',fax:'',samples:false,tsFallback:false,note:''};
+    var base=SUPPLIERS.find(function(sp){return sp.id===id})||(EXTRA_SUPPLIERS[id]||{id:id,name:id,codes:[],free:0,min:0,method:'要確認',fax:'',samples:false,tsFallback:false,note:''});
     var saved=state.supplierSettings[id]||{};
     return Object.assign({},base,saved);
+  }
+  if(state.supplierRulesVersion!=='20260930-v1'){
+    var authoritativeRules={
+      TS:{free:30000,min:0,leadDays:2,basis:'',shipping:0,cutoff:'平日12:00',delivery:'原則翌々日',method:'独自オンライン',payment:'取引条件による',samples:false,tsFallback:false},
+      AY:{free:0,min:25000,leadDays:2,basis:'下代',shipping:0,cutoff:'平日12:00',delivery:'当日発送',method:'FAX',payment:'代金引換',fax:'03-5434-2050',samples:true,tsFallback:true},
+      TG:{free:25000,min:0,leadDays:2,basis:'',shipping:1000,cutoff:'平日10:00',delivery:'当日発送 → 原則翌々日着',method:'独自オンライン / FAX',payment:'代金引換',fax:'03-3845-1225',samples:false,tsFallback:true},
+      HY:{free:30000,min:0,leadDays:2,basis:'上代',shipping:0,cutoff:'平日午前中',delivery:'当日出荷',method:'FAX',payment:'後日コンビニ払込票',samples:true,tsFallback:true},
+      IC:{free:20000,min:0,leadDays:2,basis:'下代',shipping:0,cutoff:'平日13:00',delivery:'当日出荷',method:'FAX',payment:'代金引換',fax:'03-3586-6716',samples:false,tsFallback:true},
+      IM:{free:0,min:25000,leadDays:2,basis:'',shipping:0,cutoff:'平日12:00',delivery:'当日発送 → 原則翌々日着（要確認）',method:'独自オンライン',payment:'代金引換 / 送料着払い',samples:true,tsFallback:true},
+      MS:{free:25000,min:0,leadDays:2,basis:'上代',shipping:0,cutoff:'',delivery:'',method:'FAX（専用注文用紙）',payment:'代金引換',fax:'03-5828-5912',samples:false,tsFallback:false},
+      SM:{free:27274,min:0,leadDays:2,basis:'下代',shipping:0,cutoff:'毎週木曜日 午前中',delivery:'',method:'Eメール',payment:'振込',samples:false,tsFallback:false}
+    };
+    Object.keys(authoritativeRules).forEach(function(id){
+      state.supplierSettings[id]=Object.assign({},state.supplierSettings[id]||{},authoritativeRules[id]);
+    });
+    state.supplierRulesVersion='20260930-v1';
+    save(KEY,state);
   }
   function persist(){save(KEY,state)}
 
