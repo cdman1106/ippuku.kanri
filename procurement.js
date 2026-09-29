@@ -536,16 +536,16 @@
     function redrawTable(){var body=$('#procTableBody',root);if(body){body.innerHTML=productRows(buildRows(),activeFilter,search?search.value:'');bindTable(body)}}
     if(search)search.oninput=redrawTable;
     $$('[data-proc-supplier-filter]',root).forEach(function(b){b.onclick=function(){$$('[data-proc-supplier-filter]',root).forEach(function(x){x.classList.remove('active')});b.classList.add('active');activeFilter=b.dataset.procSupplierFilter;redrawTable()}});
+    $('[data-proc-doc]',root).forEach(function(b){b.onclick=function(){openOrderDocument(b.dataset.procDoc)}});
     bindTable(root);
-    $$('[data-proc-doc]',root).forEach(function(b){b.onclick=function(){openOrderDocument(b.dataset.procDoc)}});
     $$('[data-proc-fax]',root).forEach(function(b){b.onclick=function(){sendFaxGroup(b.dataset.procFax)}});
     $$('[data-proc-sent]',root).forEach(function(b){b.onclick=function(){recordSent(b.dataset.procSent)}});
     var faxAll=$('#procFaxAll',root);if(faxAll)faxAll.onclick=sendFaxAll;
     $$('[data-proc-shortage]',root).forEach(function(b){b.onclick=function(){recordShortage(b.dataset.procShortage)}});
   }
   function bindTable(root){
-    $('[data-proc-qty]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procQty,row=buildRows().find(function(r){return r.key===key}),step=row?Math.max(1,row.pack):1,raw=Math.max(0,num(i.value)),rounded=raw>0?Math.ceil(raw/step)*step:0,ov=state.overrides[key]||{};ov.manualQty=rounded;delete ov.autoExtra;state.overrides[key]=ov;persist();render()}});
-    $('[data-proc-pack]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procPack,row=buildRows().find(function(r){return r.key===key}),minStep=row&&row.orderKind==='cigarette'?10:(row&&row.orderKind!=='other'?5:1),ov=state.overrides[key]||{};ov.pack=Math.max(minStep,num(i.value,minStep));delete ov.manualQty;delete ov.autoExtra;state.overrides[key]=ov;persist();render()}});
+    $$('[data-proc-qty]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procQty,row=buildRows().find(function(r){return r.key===key}),step=row?Math.max(1,row.pack):1,raw=Math.max(0,num(i.value)),rounded=raw>0?Math.ceil(raw/step)*step:0,ov=state.overrides[key]||{};ov.manualQty=rounded;delete ov.autoExtra;state.overrides[key]=ov;persist();render()}});
+    $$('[data-proc-pack]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procPack,row=buildRows().find(function(r){return r.key===key}),minStep=row&&row.orderKind==='cigarette'?10:(row&&row.orderKind!=='other'?5:1),ov=state.overrides[key]||{};ov.pack=Math.max(minStep,num(i.value,minStep));delete ov.manualQty;delete ov.autoExtra;state.overrides[key]=ov;persist();render()}});
     $$('[data-proc-route]',root).forEach(function(el){el.onchange=function(){setOverride(el.dataset.procRoute,{route:el.value,routeLocked:true});render()}});
   }
 
@@ -562,19 +562,45 @@
     };
   }
 
-  function orderData(group){var rows=buildRows().filter(function(r){return r.qty>0&&groupId(r)===group});return {id:group,name:groupName(group),supplier:groupSupplier(group),rows:rows,stats:groupStats(group,rows)}}
+  function orderData(group){
+    var rows=buildRows().filter(function(r){return r.qty>0&&groupId(r)===group}).map(function(r){
+      var qty=Math.max(0,num(r.qty)),cost=Math.max(0,num(r.cost)),price=Math.max(0,num(r.price));
+      return Object.assign({},r,{qty:qty,cost:cost,price:price,lineTotal:qty*cost});
+    });
+    return {id:group,name:groupName(group),supplier:groupSupplier(group),rows:rows,stats:groupStats(group,rows)};
+  }
   function orderHtml(group){
-    var d=orderData(group),cfg=supplierCfg(d.supplier),isAkiyama=d.supplier==='AY',date=today(),total=d.stats.total;
+    var d=orderData(group),cfg=supplierCfg(d.supplier),isAkiyama=d.supplier==='AY',date=today();
+    var total=d.rows.reduce(function(a,r){return a+r.lineTotal},0);
+    var retailTotal=d.rows.reduce(function(a,r){return a+r.qty*r.price},0);
     var greeting=isAkiyama?'秋山産業様':esc(d.name)+' 御中';
     var account=isAkiyama?'<p class="center"><strong>40159009　北九州のいっぷくです。</strong></p>':'';
     var sample=(cfg.samples||isAkiyama)?'<p class="sample">各種サンプルも同梱できるものがあれば、よろしくお願いいたします。</p>':'';
-    return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>'+esc(d.name)+' 発注書 '+date+'</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:#111;margin:28px;font-size:14px}.center{text-align:center}h1{font-size:20px;text-align:center;margin:0 0 12px}table{width:100%;border-collapse:collapse;margin:18px 0}th,td{border:1px solid #333;padding:8px;vertical-align:top}th{background:#f4f4f4}td.num,th.num{text-align:right;white-space:nowrap}.total{text-align:right;font-size:18px;font-weight:700}.sample{font-weight:700;margin:22px 0}.store{text-align:center;line-height:1.8;margin-top:28px}.actions{position:fixed;right:18px;top:18px}@media print{.actions{display:none}body{margin:12mm}}</style></head><body><div class="actions"><button onclick="window.print()">印刷 / PDF</button></div><h1>'+greeting+'</h1><p class="center">いつもお世話になり、ありがとうございます。</p>'+account+'<p class="center">下記の通り、発注いたします。よろしくお願いいたします。</p><table><thead><tr><th>商品名</th><th>バーコード</th><th class="num">数</th><th class="num">単価</th><th class="num">発注額</th></tr></thead><tbody>'+d.rows.map(function(r){return '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.barcode||'')+'</td><td class="num">'+r.qty+'</td><td class="num">'+yen(r.cost)+'</td><td class="num">'+yen(r.qty*r.cost)+'</td></tr>'}).join('')+'</tbody></table><div class="total">合計 '+yen(total)+'</div>'+sample+'<div class="store">いっぷく<br>〒807-0806<br>北九州市八幡西区御開1-23-1<br>090-7533-4223<br>E-mail: ippuku.tobacco@gmail.com</div></body></html>';
+    var rowsHtml=d.rows.map(function(r){
+      var costText=r.cost>0?yen(r.cost):'<span class="missing">未登録</span>';
+      var priceText=r.price>0?yen(r.price):'<span class="missing">未登録</span>';
+      var lineText=r.cost>0?yen(r.lineTotal):'<span class="missing">計算不可</span>';
+      return '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.id||'')+'</td><td>'+esc(r.barcode||'')+'</td><td class="num">'+r.qty+'</td><td class="num">'+costText+'</td><td class="num">'+priceText+'</td><td class="num">'+lineText+'</td></tr>';
+    }).join('');
+    return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(d.name)+' 発注書 '+date+'</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:#111;margin:28px;font-size:13px}.center{text-align:center}h1{font-size:21px;text-align:center;margin:0 0 12px}table{width:100%;border-collapse:collapse;margin:18px 0}th,td{border:1px solid #333;padding:7px;vertical-align:top}th{background:#f4f4f4;font-size:12px}td.num,th.num{text-align:right;white-space:nowrap}.totals{margin-left:auto;width:min(420px,100%);font-size:14px}.totals div{display:flex;justify-content:space-between;border-bottom:1px solid #ccc;padding:6px 0}.totals .grand{font-size:19px;font-weight:800;border-bottom:2px solid #111}.missing{font-weight:800;color:#a13a2a}.sample{font-weight:700;margin:22px 0}.store{text-align:center;line-height:1.8;margin-top:28px}.actions{position:fixed;right:18px;top:18px;display:flex;gap:8px}.actions button{padding:8px 12px}@media print{.actions{display:none}body{margin:10mm;font-size:11px}th,td{padding:5px}}</style></head><body><div class="actions"><button onclick="window.print()">印刷 / PDF</button></div><h1>'+greeting+'</h1><p class="center">発注日：'+date+'</p><p class="center">いつもお世話になり、ありがとうございます。</p>'+account+'<p class="center">下記の通り、発注いたします。よろしくお願いいたします。</p><table><thead><tr><th>商品名</th><th>商品ID</th><th>バーコード</th><th class="num">数量</th><th class="num">仕入単価</th><th class="num">Airレジ売価</th><th class="num">発注額</th></tr></thead><tbody>'+rowsHtml+'</tbody></table><div class="totals"><div><span>売価合計参考</span><strong>'+yen(retailTotal)+'</strong></div><div class="grand"><span>発注合計</span><strong>'+yen(total)+'</strong></div></div>'+sample+'<div class="store">いっぷく<br>〒807-0806<br>北九州市八幡西区御開1-23-1<br>090-7533-4223<br>E-mail: ippuku.tobacco@gmail.com</div></body></html>';
   }
-  function openOrderDocument(group){var d=orderData(group);if(!d.rows.length){alert('発注商品がありません');return}var w=window.open('','_blank');if(!w){alert('ポップアップを許可してください');return}w.document.open();w.document.write(orderHtml(group));w.document.close()}
+  function openOrderDocument(group){
+    try{
+      var d=orderData(group);
+      if(!d.rows.length){alert('発注商品がありません');return}
+      var html=orderHtml(group),w=window.open('','_blank');
+      if(!w){alert('注文書を開けませんでした。ブラウザのポップアップを許可してください。');return}
+      w.document.open();w.document.write(html);w.document.close();
+      try{w.focus()}catch(e){}
+    }catch(e){
+      console.error('order document error',e);
+      alert('注文書の作成に失敗しました: '+(e&&e.message?e.message:e));
+    }
+  }
   function sendFaxGroup(group){
     var d=orderData(group),cfg=supplierCfg(d.supplier);if(!cfg.fax){alert('この仕入先のFAX番号が未設定です。発注条件から登録してください。');return Promise.reject(new Error('FAX未設定'))}
     var url=String(state.settings.bridgeUrl||'').replace(/\/$/,'')+'/fax';
-    return fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({supplier:d.name,fax:cfg.fax,title:d.name+' 発注書 '+today(),html:orderHtml(group),items:d.rows.map(function(r){return {name:r.name,productId:r.id,barcode:r.barcode,qty:r.qty,unitPrice:r.cost}})})}).then(function(res){if(!res.ok)throw new Error('Bridge '+res.status);return res.json().catch(function(){return {}})}).then(function(){recordSent(group,true);alert(d.name+' をFAX送信しました')}).catch(function(e){openOrderDocument(group);alert('Mac FAX Bridgeに接続できませんでした。注文書を開いたので、現在のBrother FAX手順で送信してください。\n\n'+e.message);throw e});
+    return fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({supplier:d.name,fax:cfg.fax,title:d.name+' 発注書 '+today(),html:orderHtml(group),items:d.rows.map(function(r){return {name:r.name,productId:r.id,barcode:r.barcode,qty:r.qty,unitPrice:r.cost,retailPrice:r.price,lineTotal:r.lineTotal}})})}).then(function(res){if(!res.ok)throw new Error('Bridge '+res.status);return res.json().catch(function(){return {}})}).then(function(){recordSent(group,true);alert(d.name+' をFAX送信しました')}).catch(function(e){openOrderDocument(group);alert('Mac FAX Bridgeに接続できませんでした。注文書を開いたので、現在のBrother FAX手順で送信してください。\n\n'+e.message);throw e});
   }
   function sendFaxAll(){var gs=groups(buildRows()),ids=Object.keys(gs).filter(function(id){var sid=groupSupplier(id),cfg=sid?supplierCfg(sid):null;return id!=='HOLD'&&id!=='JT_REGULAR'&&cfg&&cfg.fax});if(!ids.length){alert('FAX番号が設定された発注先がありません');return}if(!confirm(ids.length+'社へFAX送信します。発注数量を最終確認しましたか？'))return;var p=Promise.resolve();ids.forEach(function(id){p=p.then(function(){return sendFaxGroup(id).catch(function(){return null})})})}
   function recordSent(group,silent){var d=orderData(group);if(!d.rows.length)return;state.orders.push({id:Date.now()+'-'+Math.random().toString(36).slice(2,6),date:new Date().toLocaleString('ja-JP'),group:group,groupName:d.name,total:d.stats.total,shortageAmount:0,items:d.rows.map(function(r){return {key:r.key,name:r.name,productId:r.id,qty:r.qty,cost:r.cost}})});persist();if(!silent){alert('発注履歴に登録しました');render()}}
