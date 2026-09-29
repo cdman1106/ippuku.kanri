@@ -641,7 +641,7 @@
     $$('.page').forEach(function(p){p.classList.toggle('active',p.dataset.page===name)});
     $$('.nav-item').forEach(function(b){b.classList.toggle('active',b.dataset.go===name)});
     $('#bottomNav').style.display=name==='customer'?'none':'flex'; $('.topbar').style.display=name==='customer'?'none':'flex'; document.body.classList.toggle('customer-mode',name==='customer');
-    var t={dashboard:'店舗ダッシュボード',seats:'座席・注文管理',orders:'注文一覧',analytics:'売上分析',inventory:'在庫・発注',reserve:'取り置き管理',settings:'設定'};
+    var t={dashboard:'店舗ダッシュボード',seats:'座席・注文管理',orders:'注文一覧',analytics:'売上分析',inventory:'在庫・発注',procurement:'たばこ・喫煙具 発注',reserve:'取り置き管理',settings:'設定'};
     if(t[name]) $('#pageTitle').textContent=t[name];
     if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory'){renderInventory();if(backendReady)syncSharedStateKey('inventory')} if(name==='reserve'){renderReserves();if(backendReady)syncSharedStateKey('reserves')} if(name==='customer'){renderCustomer();if(backendReady)syncSharedStateKey('promos');startCustomerSeatWatch()}else{stopCustomerSeatWatch()}
     window.scrollTo(0,0);
