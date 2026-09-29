@@ -3,7 +3,7 @@
   var $=function(s,root){return (root||document).querySelector(s)};
   var $$=function(s,root){return Array.from((root||document).querySelectorAll(s))};
   var yen=function(n){return '¥'+Math.round(Number(n||0)).toLocaleString('ja-JP')};
-  var num=function(v,d){var raw=String(v==null?'':v).replace(/[¥￥,\\s]/g,'').trim();if(raw==='')return d==null?0:d;var n=Number(raw);return Number.isFinite(n)?n:(d==null?0:d)};
+  var num=function(v,d){var raw=String(v==null?'':v).replace(/[¥￥,\s]/g,'').trim();if(raw==='')return d==null?0:d;var n=Number(raw);return Number.isFinite(n)?n:(d==null?0:d)};
   var esc=function(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]})};
   var norm=function(v){return String(v==null?'':v).normalize('NFKC').replace(/[\s　]+/g,'').replace(/[（）()【】\[\]・･:：]/g,'').toLowerCase()};
   var today=function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
@@ -349,9 +349,9 @@
   function bindTable(root){
     $$('[data-proc-qty]',root).forEach(function(i){i.onchange=function(){setOverride(i.dataset.procQty,{qty:Math.max(0,num(i.value))});render()}});
     $$('[data-proc-pack]',root).forEach(function(i){i.onchange=function(){setOverride(i.dataset.procPack,{pack:Math.max(1,num(i.value,1)),qty:null});var ov=state.overrides[i.dataset.procPack]||{};delete ov.qty;state.overrides[i.dataset.procPack]=ov;persist();render()}});
-    $('[data-proc-air-unit]',root).forEach(function(el){el.onchange=function(){var key=el.dataset.procAirUnit,ov=state.overrides[key]||{};ov.airUnit=el.value;ov.orderUnit=el.value;delete ov.qty;state.overrides[key]=ov;persist();render()}});
-    $('[data-proc-carton-size]',root).forEach(function(el){el.onchange=function(){var key=el.dataset.procCartonSize,ov=state.overrides[key]||{};ov.cartonSize=Math.max(1,num(el.value,1));delete ov.qty;state.overrides[key]=ov;persist();render()}});
-    $('[data-proc-order-unit]',root).forEach(function(el){el.onchange=function(){var key=el.dataset.procOrderUnit,ov=state.overrides[key]||{};ov.orderUnit=el.value;delete ov.qty;state.overrides[key]=ov;persist();render()}});
+    $$('[data-proc-air-unit]',root).forEach(function(el){el.onchange=function(){var key=el.dataset.procAirUnit,ov=state.overrides[key]||{};ov.airUnit=el.value;ov.orderUnit=el.value;delete ov.qty;state.overrides[key]=ov;persist();render()}});
+    $$('[data-proc-carton-size]',root).forEach(function(el){el.onchange=function(){var key=el.dataset.procCartonSize,ov=state.overrides[key]||{};ov.cartonSize=Math.max(1,num(el.value,1));delete ov.qty;state.overrides[key]=ov;persist();render()}});
+    $$('[data-proc-order-unit]',root).forEach(function(el){el.onchange=function(){var key=el.dataset.procOrderUnit,ov=state.overrides[key]||{};ov.orderUnit=el.value;delete ov.qty;state.overrides[key]=ov;persist();render()}});
     $$('[data-proc-route]',root).forEach(function(el){el.onchange=function(){setOverride(el.dataset.procRoute,{route:el.value,routeLocked:true});render()}});
   }
 
