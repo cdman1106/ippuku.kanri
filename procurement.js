@@ -570,19 +570,34 @@
     return {id:group,name:groupName(group),supplier:groupSupplier(group),rows:rows,stats:groupStats(group,rows)};
   }
   function orderHtml(group){
-    var d=orderData(group),cfg=supplierCfg(d.supplier),isAkiyama=d.supplier==='AY',date=today();
+    var d=orderData(group),cfg=supplierCfg(d.supplier),isAkiyama=d.supplier==='AY';
     var total=d.rows.reduce(function(a,r){return a+r.lineTotal},0);
-    var retailTotal=d.rows.reduce(function(a,r){return a+r.qty*r.price},0);
+    var missingCost=d.rows.filter(function(r){return !(r.cost>0)}).length;
     var greeting=isAkiyama?'秋山産業様':esc(d.name)+' 御中';
-    var account=isAkiyama?'<p class="center"><strong>40159009　北九州のいっぷくです。</strong></p>':'';
+    var account=isAkiyama?'<p class="account"><strong>40159009　北九州のいっぷくです。</strong></p>':'';
     var sample=(cfg.samples||isAkiyama)?'<p class="sample">各種サンプルも同梱できるものがあれば、よろしくお願いいたします。</p>':'';
     var rowsHtml=d.rows.map(function(r){
-      var costText=r.cost>0?yen(r.cost):'<span class="missing">未登録</span>';
-      var priceText=r.price>0?yen(r.price):'<span class="missing">未登録</span>';
-      var lineText=r.cost>0?yen(r.lineTotal):'<span class="missing">計算不可</span>';
-      return '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.id||'')+'</td><td>'+esc(r.barcode||'')+'</td><td class="num">'+r.qty+'</td><td class="num">'+costText+'</td><td class="num">'+priceText+'</td><td class="num">'+lineText+'</td></tr>';
+      var unitPrice=r.cost>0?Math.round(r.cost).toLocaleString('ja-JP'):'要確認';
+      var lineTotal=r.cost>0?yen(r.lineTotal):'要確認';
+      return '<tr><td class="product">'+esc(r.name)+'</td><td class="barcode">'+esc(r.barcode||'')+'</td><td class="qty">'+r.qty+'</td><td class="unit">'+unitPrice+'</td><td class="amount">'+lineTotal+'</td></tr>';
     }).join('');
-    return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(d.name)+' 発注書 '+date+'</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:#111;margin:28px;font-size:13px}.center{text-align:center}h1{font-size:21px;text-align:center;margin:0 0 12px}table{width:100%;border-collapse:collapse;margin:18px 0}th,td{border:1px solid #333;padding:7px;vertical-align:top}th{background:#f4f4f4;font-size:12px}td.num,th.num{text-align:right;white-space:nowrap}.totals{margin-left:auto;width:min(420px,100%);font-size:14px}.totals div{display:flex;justify-content:space-between;border-bottom:1px solid #ccc;padding:6px 0}.totals .grand{font-size:19px;font-weight:800;border-bottom:2px solid #111}.missing{font-weight:800;color:#a13a2a}.sample{font-weight:700;margin:22px 0}.store{text-align:center;line-height:1.8;margin-top:28px}.actions{position:fixed;right:18px;top:18px;display:flex;gap:8px}.actions button{padding:8px 12px}@media print{.actions{display:none}body{margin:10mm;font-size:11px}th,td{padding:5px}}</style></head><body><div class="actions"><button onclick="window.print()">印刷 / PDF</button></div><h1>'+greeting+'</h1><p class="center">発注日：'+date+'</p><p class="center">いつもお世話になり、ありがとうございます。</p>'+account+'<p class="center">下記の通り、発注いたします。よろしくお願いいたします。</p><table><thead><tr><th>商品名</th><th>商品ID</th><th>バーコード</th><th class="num">数量</th><th class="num">仕入単価</th><th class="num">Airレジ売価</th><th class="num">発注額</th></tr></thead><tbody>'+rowsHtml+'</tbody></table><div class="totals"><div><span>売価合計参考</span><strong>'+yen(retailTotal)+'</strong></div><div class="grand"><span>発注合計</span><strong>'+yen(total)+'</strong></div></div>'+sample+'<div class="store">いっぷく<br>〒807-0806<br>北九州市八幡西区御開1-23-1<br>090-7533-4223<br>E-mail: ippuku.tobacco@gmail.com</div></body></html>';
+    var warning=missingCost?'<p class="warning">※ 仕入単価が未登録の商品が '+missingCost+' 件あります。商品台帳の原価を確認してください。</p>':'';
+    return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(d.name)+' 発注書</title><style>'+
+      '@page{size:A4;margin:12mm 10mm}'+
+      'body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:#111;margin:0;font-size:13px}'+
+      '.head{text-align:center;margin:4px 0 26px}.head h1{font-size:21px;font-weight:500;margin:0 0 12px}.head p{margin:7px 0;font-size:15px}.account{font-size:15px}'+
+      'table{width:100%;border-collapse:collapse;table-layout:fixed;margin:0}th,td{border:1.2px solid #111;padding:7px 5px;vertical-align:middle}th{font-size:14px;text-align:left;font-weight:800}'+
+      'th:nth-child(1),td.product{width:58%}th:nth-child(2),td.barcode{width:18%}th:nth-child(3),td.qty{width:6%;text-align:center}th:nth-child(4),td.unit{width:8%;text-align:right}th:nth-child(5),td.amount{width:10%;text-align:right;white-space:nowrap}'+
+      'td.product{font-weight:700;line-height:1.35}.total{display:flex;justify-content:flex-end;margin-top:5px;font-size:16px;font-weight:500}.total span{min-width:110px;text-align:right}'+
+      '.sample{font-weight:800;font-size:15px;margin:27px 6px 30px}.store{text-align:center;font-size:14px;line-height:1.75}.store .mail{margin-top:3px;text-decoration:underline}.dash{text-align:center;margin-top:10px}'+
+      '.warning{font-size:11px;font-weight:700;margin:8px 0;color:#8a2f22}.actions{position:fixed;right:18px;top:18px}.actions button{padding:8px 12px}'+
+      '@media print{.actions{display:none}body{font-size:11px}.head{margin-bottom:20px}.head h1{font-size:18px}.head p,.account{font-size:13px}th,td{padding:5px 4px}.sample{font-size:13px;margin:20px 5px}.store{font-size:12px}}'+
+      '</style></head><body><div class="actions"><button onclick="window.print()">印刷 / PDF</button></div>'+
+      '<div class="head"><h1>'+greeting+'</h1><p>いつもお世話になり、ありがとうございます。</p>'+account+'<p>下記の通り、発注いたします。よろしくお願いいたします。</p></div>'+
+      '<table><thead><tr><th>商品名</th><th>バーコード</th><th>数</th><th>単価</th><th>発注額</th></tr></thead><tbody>'+rowsHtml+'</tbody></table>'+
+      '<div class="total"><span>'+yen(total)+'</span></div>'+warning+sample+
+      '<div class="store">いっぷく<br>〒807-0806<br>北九州市八幡西区御開1-23-1<br>090-7533-4223<br><div class="mail">E-mail: ippuku.tobacco@gmail.com</div></div><div class="dash">------------------------------------</div>'+
+      '</body></html>';
   }
   function openOrderDocument(group){
     try{
