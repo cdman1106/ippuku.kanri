@@ -180,7 +180,7 @@
   function groupSupplier(id){if(id==='TS_MIXED'||id==='JT_REGULAR'||id==='JT_NORMAL')return 'TS';if(id.indexOf('DIRECT_')===0)return id.replace('DIRECT_','');return ''}
 
   function groups(rows){var m={};rows.filter(function(r){return r.qty>0}).forEach(function(r){var id=groupId(r);(m[id]||(m[id]=[])).push(r)});return m}
-  function thresholdForGroup(id){if(id==='TS_MIXED')return 30000;if(id==='JT_REGULAR'||id==='JT_NORMAL'||id==='HOLD')return 0;return num(supplierCfg(groupSupplier(id)).free)}
+  function thresholdForGroup(id){if(id==='TS_MIXED')return num(supplierCfg('TS').free,30000);if(id==='JT_REGULAR'||id==='JT_NORMAL'||id==='HOLD')return 0;return num(supplierCfg(groupSupplier(id)).free)}
   function groupStats(id,items){
     var total=items.reduce(function(a,r){return a+r.qty*r.cost},0), threshold=thresholdForGroup(id), risk=Math.max(0,Math.min(100,num(state.settings.shortageRisk,5)))/100, riskAdjusted=total*(1-risk);
     var status='条件未設定';
@@ -236,7 +236,7 @@
 
   function productPanel(rows){
     var suppliers=['all'].concat(SUPPLIERS.map(function(s){return s.id}),['UNKNOWN']);
-    return '<section class="panel proc-block"><div class="panel-head"><div><h3>④ 商品別 発注優先順位</h3><p>在庫充足率が低い順。数量・発注先はここで変更できます。</p></div><input id="procSearch" class="search" placeholder="商品名・JANで検索"></div><div class="proc-filters">'+suppliers.map(function(id){return '<button class="filter '+(id==='all'?'active':'')+'" data-proc-supplier-filter="'+id+'">'+(id==='all'?'すべて':id==='UNKNOWN'?'未判定':esc(supplierCfg(id).name))+'</button>'}).join('')+'</div><div class="table-scroll proc-table-wrap"><table class="proc-table"><thead><tr><th>優先</th><th>商品</th><th>仕入先</th><th>60日販売</th><th>在庫</th><th>45日予測</th><th>充足率</th><th>発注単位</th><th>推奨</th><th>発注数</th><th>発注先</th><th>金額</th></tr></thead><tbody id="procTableBody">'+productRows(rows)+'</tbody></table></div></section>';
+    return '<section class="panel proc-block"><div class="panel-head"><div><h3>④ 商品別 発注優先順位</h3><p>在庫充足率が低い順。数量・発注先はここで変更できます。</p></div><input id="procSearch" class="search" placeholder="商品名・JANで検索"></div><div class="proc-filters">'+suppliers.map(function(id){return '<button class="filter '+(id==='all'?'active':'')+'" data-proc-supplier-filter="'+id+'">'+(id==='all'?'すべて':id==='UNKNOWN'?'未判定':esc(supplierCfg(id).name))+'</button>'}).join('')+'</div><div class="table-scroll proc-table-wrap"><table class="proc-table"><thead><tr><th>優先</th><th>商品</th><th>仕入先</th><th>'+esc(state.settings.salesDays||60)+'日販売</th><th>在庫</th><th>'+esc(state.settings.targetDays||45)+'日予測</th><th>充足率</th><th>発注単位</th><th>推奨</th><th>発注数</th><th>発注先</th><th>金額</th></tr></thead><tbody id="procTableBody">'+productRows(rows)+'</tbody></table></div></section>';
   }
   function productRows(rows,filter,search){
     filter=filter||'all';search=norm(search||'');
