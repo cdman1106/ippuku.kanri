@@ -99,11 +99,16 @@
     var c={id:findCol(h,['商品ID']),name:findCol(h,['商品名']),stock:findCol(h,['現在庫数','在庫数','在庫数量','在庫残数','現在庫','在庫'])};
     if(c.id<0)throw new Error('在庫CSVに商品ID列がありません。Airレジの在庫管理CSVを選択してください。');
     if(c.stock<0)throw new Error('在庫数の列を見つけられませんでした。Airレジの在庫管理CSVを選択してください。');
-    return data.map(function(r){
+    var map={};
+    data.forEach(function(r){
       var id=cell(r,c.id);
-      if(!id)return null;
-      return {id:String(id).trim(),name:cell(r,c.name),stock:num(cell(r,c.stock))};
-    }).filter(Boolean);
+      if(!id)return;
+      var k='id:'+String(id).trim();
+      if(!map[k])map[k]={id:String(id).trim(),name:cell(r,c.name),stock:0,rows:0};
+      map[k].stock+=num(cell(r,c.stock));
+      map[k].rows++;
+    });
+    return Object.keys(map).map(function(k){return map[k]});
   }
   function parseSales(rows){
     var hi=headerInfo(rows),h=hi.headers,data=rows.slice(hi.index+1);
@@ -161,26 +166,82 @@
 
   function buildRows(){
     var inv=indexById(state.inventory),sales=indexById(state.sales),salesDays=Math.max(1,num(state.settings.salesDays,60)),targetDays=Math.max(1,num(state.settings.targetDays,45)),out=[];
+    var masterById={};
+
     (state.master||[]).forEach(function(p){
       if(String(p.visible).indexOf('非表示')>=0)return;
       if(/廃盤|非継続/.test(String(p.note||'')))return;
       if(/カートン/i.test(String(p.name||'')))return;
       if(!p.id)return;
-      var k=keyOf(p),si=lookupById(sales,p),ii=lookupById(inv,p),salesMatched=!!si,inventoryMatched=!!ii;
+
+      var id=String(p.id).trim();
+      if(!id)return;
+
+      if(!masterById[id]){
+        masterById[id]={
+          id:id,
+          name:p.name||'',
+          barcode:p.barcode||'',
+          barcodes:[],
+          category:p.category||'',
+          cost:num(p.cost),
+          price:num(p.price),
+          note:p.note||'',
+          productCode:p.productCode||'',
+          sourceRows:0
+        };
+      }
+
+      var m=masterById[id];
+      m.sourceRows++;
+      if(p.barcode&&m.barcodes.indexOf(p.barcode)<0)m.barcodes.push(p.barcode);
+      if(!m.name&&p.name)m.name=p.name;
+      if(!m.barcode&&p.barcode)m.barcode=p.barcode;
+      if(!m.category&&p.category)m.category=p.category;
+      if(!m.cost&&num(p.cost))m.cost=num(p.cost);
+      if(!m.price&&num(p.price))m.price=num(p.price);
+      if(!m.note&&p.note)m.note=p.note;
+      if(!m.productCode&&p.productCode)m.productCode=p.productCode;
+    });
+
+    Object.keys(masterById).forEach(function(id){
+      var p=masterById[id],k='id:'+id;
+      var si=lookupById(sales,p),ii=lookupById(inv,p);
+      var salesMatched=!!si,inventoryMatched=!!ii;
       si=si||{};ii=ii||{};
-      var supplier=supplierFor(p),ov=state.overrides[k]||{},sold=num(si.qty),stock=num(ii.stock),forecast=sold*(targetDays/salesDays),need=Math.max(0,forecast-stock),step=Math.max(1,num(ov.pack,1));
+
+      var supplier=supplierFor(p),ov=state.overrides[k]||{};
+      var sold=num(si.qty),stock=num(ii.stock);
+      var forecast=sold*(targetDays/salesDays);
+      var need=Math.max(0,forecast-stock);
+      var step=Math.max(1,num(ov.pack,1));
       var noRecentSales=sold<=0;
       var recommended=!noRecentSales&&inventoryMatched&&need>0?Math.ceil(need/step)*step:0;
       var fill=forecast>0?stock/forecast:999,daily=sold/salesDays;
       var qty=noRecentSales?0:Math.max(0,num(ov.qty,recommended));
       var isJT=String(p.note||'').trim()==='JT';
-      out.push({key:k,id:String(p.id).trim(),name:p.name,barcode:p.barcode,category:p.category,cost:num(p.cost),price:num(p.price),note:p.note,supplier:supplier,sold:sold,stock:stock,forecast:forecast,need:need,fill:fill,daily:daily,pack:step,recommended:recommended,qty:qty,noRecentSales:noRecentSales,inventoryMatched:inventoryMatched,salesMatched:salesMatched,tsEligible:defaultTsEligible(p,supplier),route:ov.route||'',isJT:isJT,newProduct:false});
+
+      out.push({
+        key:k,id:id,name:p.name,barcode:p.barcode,barcodes:p.barcodes,category:p.category,
+        cost:num(p.cost),price:num(p.price),note:p.note,supplier:supplier,
+        sold:sold,stock:stock,forecast:forecast,need:need,fill:fill,daily:daily,
+        pack:step,recommended:recommended,qty:qty,noRecentSales:noRecentSales,
+        inventoryMatched:inventoryMatched,salesMatched:salesMatched,
+        sourceRows:p.sourceRows,inventoryRows:num(ii.rows,inventoryMatched?1:0),
+        tsEligible:defaultTsEligible(p,supplier),route:ov.route||'',isJT:isJT,newProduct:false
+      });
     });
+
     (state.manual||[]).forEach(function(p){
       var k='manual:'+p.uid,ov=state.overrides[k]||{},qty=Math.max(0,num(ov.qty,p.initialQty||1)),step=Math.max(1,num(ov.pack,p.pack||1));
-      out.push({key:k,id:p.id||'',name:p.name,barcode:p.barcode||'',category:p.category||'新商品',cost:num(p.cost),price:num(p.price),note:'NEW',supplier:p.supplier||'',sold:0,stock:0,forecast:0,need:qty,fill:0,daily:0,pack:step,recommended:qty,qty:qty,inventoryMatched:false,salesMatched:false,tsEligible:!!p.tsEligible,route:ov.route||'',isJT:false,newProduct:true});
+      out.push({key:k,id:p.id||'',name:p.name,barcode:p.barcode||'',barcodes:p.barcode?[p.barcode]:[],category:p.category||'新商品',cost:num(p.cost),price:num(p.price),note:'NEW',supplier:p.supplier||'',sold:0,stock:0,forecast:0,need:qty,fill:0,daily:0,pack:step,recommended:qty,qty:qty,noRecentSales:false,inventoryMatched:false,salesMatched:false,sourceRows:1,inventoryRows:0,tsEligible:!!p.tsEligible,route:ov.route||'',isJT:false,newProduct:true});
     });
-    out.sort(function(a,b){if(a.newProduct!==b.newProduct)return a.newProduct?-1:1;if(a.fill!==b.fill)return a.fill-b.fill;return b.daily-a.daily});
+
+    out.sort(function(a,b){
+      if(a.newProduct!==b.newProduct)return a.newProduct?-1:1;
+      if(a.fill!==b.fill)return a.fill-b.fill;
+      return b.daily-a.daily;
+    });
     return out;
   }
 
@@ -242,11 +303,16 @@
   function render(){
     var root=$('#procurementApp');if(!root)return;
     var rows=buildRows();
-    var loaded={master:(state.master||[]).length,inventory:(state.inventory||[]).length,sales:(state.sales||[]).length};
+    var masterIds={};
+    (state.master||[]).forEach(function(p){
+      if(!p.id||String(p.visible).indexOf('非表示')>=0||/廃盤|非継続/.test(String(p.note||''))||/カートン/i.test(String(p.name||'')))return;
+      masterIds[String(p.id).trim()]=true;
+    });
+    var loaded={master:Object.keys(masterIds).length,inventory:(state.inventory||[]).length,sales:(state.sales||[]).length};
     var shortages=rows.filter(function(r){return r.recommended>0}).length,totalNeed=rows.reduce(function(a,r){return a+r.qty*r.cost},0),inventoryMatchedCount=rows.filter(function(r){return r.inventoryMatched}).length,inventoryUnmatchedCount=(state.inventory||[]).length?rows.filter(function(r){return !r.newProduct&&!r.inventoryMatched}).length:0;
     root.innerHTML=
       '<div class="proc-kpis">'+
-        '<article><span>商品台帳</span><strong>'+loaded.master.toLocaleString()+'</strong><small>商品ID基準</small></article>'+
+        '<article><span>商品台帳</span><strong>'+loaded.master.toLocaleString()+'</strong><small>同一商品IDは1商品に統合</small></article>'+
         '<article><span>在庫CSV照合</span><strong>'+inventoryMatchedCount.toLocaleString()+'</strong><small>'+(inventoryUnmatchedCount?'未照合 '+inventoryUnmatchedCount+'件':'照合済み')+'</small></article>'+
         '<article><span>発注案総額</span><strong>'+yen(totalNeed)+'</strong><small>選択中</small></article>'+
         '<article><span>予測期間</span><strong>'+esc(state.settings.targetDays||45)+'日</strong><small>売上'+esc(state.settings.salesDays||60)+'日基準</small></article>'+
@@ -283,7 +349,7 @@
 
   function productPanel(rows){
     var suppliers=['all'].concat(SUPPLIERS.map(function(sp){return sp.id}),['UNKNOWN']);
-    return '<section class="panel proc-block"><div class="panel-head"><div><h3>④ 商品別 発注優先順位</h3><p>商品台帳・在庫・売上はAirレジの商品IDだけで照合します。商品名に「カートン」が入る商品は除外します。</p></div><input id="procSearch" class="search" placeholder="商品名・商品IDで検索"></div><div class="proc-filters">'+suppliers.map(function(id){return '<button class="filter '+(id==='all'?'active':'')+'" data-proc-supplier-filter="'+id+'">'+(id==='all'?'すべて':id==='UNKNOWN'?'未判定':esc(supplierCfg(id).name))+'</button>'}).join('')+'</div><div class="table-scroll proc-table-wrap"><table class="proc-table"><thead><tr><th>優先</th><th>商品</th><th>商品ID</th><th>仕入先</th><th>'+esc(state.settings.salesDays||60)+'日販売</th><th>在庫</th><th>'+esc(state.settings.targetDays||45)+'日予測</th><th>充足率</th><th>発注刻み</th><th>推奨</th><th>発注数</th><th>発注先</th><th>金額</th></tr></thead><tbody id="procTableBody">'+productRows(rows)+'</tbody></table></div></section>';
+    return '<section class="panel proc-block"><div class="panel-head"><div><h3>④ 商品別 発注優先順位</h3><p>商品ID単位で集計。推奨数 = max(0, 過去'+esc(state.settings.salesDays||60)+'日販売 × '+esc(state.settings.targetDays||45)+'/'+esc(state.settings.salesDays||60)+' − 現在庫)。</p></div><input id="procSearch" class="search" placeholder="商品名・商品IDで検索"></div><div class="proc-filters">'+suppliers.map(function(id){return '<button class="filter '+(id==='all'?'active':'')+'" data-proc-supplier-filter="'+id+'">'+(id==='all'?'すべて':id==='UNKNOWN'?'未判定':esc(supplierCfg(id).name))+'</button>'}).join('')+'</div><div class="table-scroll proc-table-wrap"><table class="proc-table"><thead><tr><th>優先</th><th>商品</th><th>商品ID</th><th>仕入先</th><th>'+esc(state.settings.salesDays||60)+'日販売</th><th>在庫</th><th>'+esc(state.settings.targetDays||45)+'日予測</th><th>充足率</th><th>発注刻み</th><th>推奨</th><th>発注数</th><th>発注先</th><th>金額</th></tr></thead><tbody id="procTableBody">'+productRows(rows)+'</tbody></table></div></section>';
   }
   function productRows(rows,filter,search){
     filter=filter||'all';search=norm(search||'');
@@ -300,8 +366,8 @@
       routes.push(['hold','見送り']);
       var stockText=((state.inventory||[]).length&&!r.inventoryMatched&&!r.newProduct)?'<span class="proc-unmatched">未照合</span>':r.stock.toFixed(1);
       var salesText=((state.sales||[]).length&&!r.salesMatched&&!r.newProduct)?'<span class="proc-unmatched">未照合</span>':r.sold.toFixed(0);
-      var noSalesNote=r.noRecentSales&&!r.newProduct?'<small class="proc-nosales">過去2カ月販売0 → 発注しない</small>':'';
-      return '<tr data-proc-row="'+esc(r.key)+'"><td><span class="proc-priority p-'+urgent+'">'+urgent+'</span></td><td><strong>'+esc(r.name)+'</strong><small>'+esc(r.barcode||'JANなし')+(r.newProduct?' / 新規':'')+'</small>'+noSalesNote+'</td><td><code>'+esc(r.id||'未登録')+'</code></td><td>'+esc(r.supplier?supplierCfg(r.supplier).name:'未判定')+(r.tsEligible?'<small>TS代替候補</small>':'')+'</td><td>'+salesText+'</td><td>'+stockText+'</td><td>'+r.forecast.toFixed(1)+'</td><td><b>'+rate+'</b></td><td><input class="proc-mini" type="number" min="1" data-proc-pack="'+esc(r.key)+'" value="'+r.pack+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td>'+r.recommended+'</td><td><input class="proc-mini" type="number" min="0" data-proc-qty="'+esc(r.key)+'" value="'+r.qty+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td><select data-proc-route="'+esc(r.key)+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'>'+routes.map(function(x){return '<option value="'+x[0]+'" '+(route===x[0]?'selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></td><td>'+yen(r.qty*r.cost)+'</td></tr>';
+      var noSalesNote=r.noRecentSales&&!r.newProduct?'<small class="proc-nosales">過去2カ月販売0 → 発注しない</small>':'';var mergeNote=r.sourceRows>1?'<small>商品台帳 '+r.sourceRows+'行を商品IDで統合</small>':'';var invMergeNote=r.inventoryRows>1?'<small>在庫 '+r.inventoryRows+'行を合計</small>':'';
+      return '<tr data-proc-row="'+esc(r.key)+'"><td><span class="proc-priority p-'+urgent+'">'+urgent+'</span></td><td><strong>'+esc(r.name)+'</strong><small>'+esc(r.barcode||'JANなし')+(r.newProduct?' / 新規':'')+'</small>'+noSalesNote+mergeNote+invMergeNote+'</td><td><code>'+esc(r.id||'未登録')+'</code></td><td>'+esc(r.supplier?supplierCfg(r.supplier).name:'未判定')+(r.tsEligible?'<small>TS代替候補</small>':'')+'</td><td>'+salesText+'</td><td>'+stockText+'</td><td>'+r.forecast.toFixed(1)+'</td><td><b>'+rate+'</b></td><td><input class="proc-mini" type="number" min="1" data-proc-pack="'+esc(r.key)+'" value="'+r.pack+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td>'+r.recommended+'</td><td><input class="proc-mini" type="number" min="0" data-proc-qty="'+esc(r.key)+'" value="'+r.qty+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td><select data-proc-route="'+esc(r.key)+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'>'+routes.map(function(x){return '<option value="'+x[0]+'" '+(route===x[0]?'selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></td><td>'+yen(r.qty*r.cost)+'</td></tr>';
     }).join('');
   }
 
