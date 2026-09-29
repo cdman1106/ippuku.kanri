@@ -90,22 +90,22 @@
 
   function parseMaster(rows){
     var hi=headerInfo(rows), h=hi.headers, data=rows.slice(hi.index+1);
-    var c={id:findCol(h,['商品ID','商品id']),name:findCol(h,['商品名']),barcode:findCol(h,['バーコード','JAN','JANコード']),category:findCol(h,['カテゴリーID','カテゴリID','カテゴリー','カテゴリ']),cost:findCol(h,['原価']),price:findCol(h,['価格','売価']),note:findCol(h,['備考','コメント','メモ']),visible:findCol(h,['表示/非表示','表示']),code:findCol(h,['商品コード'])};
+    var c={id:findCol(h,['商品ID','商品id']),name:findCol(h,['【必須】商品名 ※49文字','商品名']),barcode:findCol(h,['バーコード','JAN','JANコード']),category:findCol(h,['カテゴリーID','カテゴリID','カテゴリー','カテゴリ']),cost:findCol(h,['原価']),price:findCol(h,['【必須】価格 ※半角数字','売価','価格']),note:findCol(h,['備考','コメント','メモ']),visible:findCol(h,['表示/非表示','表示']),code:findCol(h,['商品コード'])};
     return data.map(function(r){var name=cell(r,c.name);if(!name)return null;return {id:cell(r,c.id),name:name,barcode:stripBarcode(cell(r,c.barcode)),category:cell(r,c.category),cost:num(cell(r,c.cost)),price:num(cell(r,c.price)),note:cell(r,c.note),visible:cell(r,c.visible),productCode:cell(r,c.code)}}).filter(Boolean);
   }
   function parseInventory(rows){
     var hi=headerInfo(rows), h=hi.headers, data=rows.slice(hi.index+1);
-    var c={id:findCol(h,['商品ID']),name:findCol(h,['商品名']),barcode:findCol(h,['バーコード','JAN']),stock:findCol(h,['現在庫数','在庫数','現在庫','在庫'])};
+    var c={id:findCol(h,['商品ID']),name:findCol(h,['商品名']),barcode:findCol(h,['バーコード','JAN']),stock:findCol(h,['現在庫数','在庫数','在庫数量','在庫残数','現在庫','在庫'])};
     return data.map(function(r){var name=cell(r,c.name);var id=cell(r,c.id);if(!name&&!id)return null;return {id:id,name:name,barcode:stripBarcode(cell(r,c.barcode)),stock:num(cell(r,c.stock))}}).filter(Boolean);
   }
   function parseSales(rows){
     var hi=headerInfo(rows), h=hi.headers, data=rows.slice(hi.index+1);
-    var c={id:findCol(h,['商品ID']),name:findCol(h,['商品名']),barcode:findCol(h,['バーコード','JAN']),qty:findCol(h,['販売数量','販売数','売上数量','数量','販売点数','売上点数'])};
+    var c={id:findCol(h,['商品ID']),name:findCol(h,['商品名']),barcode:findCol(h,['バーコード','JAN']),qty:findCol(h,['販売数量','販売数','売上数量','販売個数','商品数','個数','数量','販売点数','売上点数'])};
     var map={};
     data.forEach(function(r){var id=cell(r,c.id), name=cell(r,c.name), bc=stripBarcode(cell(r,c.barcode));if(!id&&!name&&!bc)return;var k=id?('id:'+id):(bc?('bc:'+bc):('n:'+norm(name)));if(!map[k])map[k]={id:id,name:name,barcode:bc,qty:0};map[k].qty+=num(cell(r,c.qty))});
     return Object.keys(map).map(function(k){return map[k]});
   }
-  function keyOf(x){if(x.id)return 'id:'+x.id;if(x.barcode)return 'bc:'+x.barcode;return 'n:'+norm(x.name)}
+  function keyOf(x){if(x.barcode)return 'bc:'+x.barcode;if(x.id)return 'id:'+x.id;return 'n:'+norm(x.name)}
   function indexBy(arr){var m={};(arr||[]).forEach(function(x){m[keyOf(x)]=x;if(x.name)m['n:'+norm(x.name)]=x;if(x.barcode)m['bc:'+x.barcode]=x});return m}
 
   function supplierFor(p){
