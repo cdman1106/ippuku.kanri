@@ -189,6 +189,20 @@
     var tobacco=['シャグ','シガー','シガリロ','スヌース','スナッフ','葉巻','紙巻','メンソール','バージニア','ドミンゴ','チェ','フランドリア','スタンレー','パピヨン','コピ'];
     return tobacco.some(function(k){return n.indexOf(norm(k))>=0});
   }
+  function tobaccoOrderRule(p){
+    if(!looksTobacco(p))return {step:1,label:'1個単位',kind:'other'};
+    var n=norm(p.name||'');
+    var handRoll=[
+      '手巻','シャグ','ドミンゴ','フランドリア','スタンレー','アムステルダマー',
+      'チェシャグ','チェ・','ピール','チョイス','マックバレン','ドラム','ゴールデンバージニア',
+      'アンバーリーフ','コルツ','キャプテンブラック','バリシャグ','ハーベスト'
+    ];
+    var otherTobacco=['シガー','シガリロ','葉巻','スヌース','スナッフ','パイプタバコ','パイプたばこ'];
+    if(handRoll.some(function(k){return n.indexOf(norm(k))>=0}))return {step:5,label:'手巻き 5個単位',kind:'handroll'};
+    if(otherTobacco.some(function(k){return n.indexOf(norm(k))>=0}))return {step:5,label:'たばこ 5個単位',kind:'tobacco'};
+    return {step:10,label:'紙巻き 10個単位',kind:'cigarette'};
+  }
+
   function defaultTsEligible(p,supplier){
     var ov=state.overrides[keyOf(p)]||{};
     if(typeof ov.tsEligible==='boolean')return ov.tsEligible;
@@ -248,19 +262,21 @@
       var coverDays=cycleDays+leadDays+safetyDays;
       var forecast=daily*coverDays;
       var need=Math.max(0,forecast-stock);
-      var step=Math.max(1,num(ov.pack,1));
+      var orderRule=tobaccoOrderRule(p),step=Math.max(orderRule.step,num(ov.pack,orderRule.step));
       var noRecentSales=sold<=0;
       var recommended=!noRecentSales&&inventoryMatched&&need>0?Math.ceil(need/step)*step:0;
       var fill=forecast>0?stock/forecast:999;
       var autoExtra=Math.max(0,num(ov.autoExtra,0));
-      var qty=noRecentSales?0:(ov.manualQty!=null?Math.max(0,num(ov.manualQty)):recommended+autoExtra);
+      var manualRaw=Math.max(0,num(ov.manualQty,0));
+      var manualRounded=manualRaw>0?Math.ceil(manualRaw/step)*step:0;
+      var qty=noRecentSales?0:(ov.manualQty!=null?manualRounded:recommended+autoExtra);
       var isJT=String(p.note||'').trim()==='JT';
 
       out.push({
         key:k,id:id,name:p.name,barcode:p.barcode,barcodes:p.barcodes,category:p.category,
         cost:num(p.cost),price:num(p.price),note:p.note,supplier:supplier,
         sold:sold,stock:stock,forecast:forecast,need:need,fill:fill,daily:daily,
-        pack:step,recommended:recommended,qty:qty,noRecentSales:noRecentSales,baseDaily:baseDaily,effectiveDaily:daily,coverDays:coverDays,revived:!!(signalActive&&signal.revived),surged:!!(signalActive&&signal.surged),
+        pack:step,orderRuleLabel:orderRule.label,orderKind:orderRule.kind,recommended:recommended,qty:qty,noRecentSales:noRecentSales,baseDaily:baseDaily,effectiveDaily:daily,coverDays:coverDays,revived:!!(signalActive&&signal.revived),surged:!!(signalActive&&signal.surged),
         inventoryMatched:inventoryMatched,salesMatched:salesMatched,
         sourceRows:p.sourceRows,inventoryRows:num(ii.rows,inventoryMatched?1:0),
         tsEligible:defaultTsEligible(p,supplier),route:ov.route||'',isJT:isJT,newProduct:false
@@ -473,8 +489,8 @@
       routes.push(['hold','見送り']);
       var stockText=((state.inventory||[]).length&&!r.inventoryMatched&&!r.newProduct)?'<span class="proc-unmatched">未照合</span>':r.stock.toFixed(1);
       var salesText=((state.sales||[]).length&&!r.salesMatched&&!r.newProduct)?'<span class="proc-unmatched">未照合</span>':r.sold.toFixed(0);
-      var noSalesNote=r.noRecentSales&&!r.newProduct?'<small class="proc-nosales">過去2カ月販売0 → 発注しない</small>':'';var signalNote=r.revived?'<small class="proc-revived">復活商品 → 最近の販売速度を優先</small>':(r.surged?'<small class="proc-revived">販売加速 → 最近の販売速度を優先</small>':'');var mergeNote=r.sourceRows>1?'<small>商品台帳 '+r.sourceRows+'行を商品IDで統合</small>':'';var invMergeNote=r.inventoryRows>1?'<small>在庫 '+r.inventoryRows+'行を合計</small>':'';
-      return '<tr data-proc-row="'+esc(r.key)+'"><td><span class="proc-priority p-'+urgent+'">'+urgent+'</span></td><td><strong>'+esc(r.name)+'</strong><small>'+esc(r.barcode||'JANなし')+(r.newProduct?' / 新規':'')+'</small>'+noSalesNote+signalNote+mergeNote+invMergeNote+'</td><td><code>'+esc(r.id||'未登録')+'</code></td><td>'+esc(r.supplier?supplierCfg(r.supplier).name:'未判定')+(r.tsEligible?'<small>TS代替候補</small>':'')+'</td><td>'+salesText+'</td><td>'+stockText+'</td><td>'+r.forecast.toFixed(1)+'</td><td><b>'+rate+'</b></td><td><input class="proc-mini" type="number" min="1" data-proc-pack="'+esc(r.key)+'" value="'+r.pack+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td>'+r.recommended+'</td><td><input class="proc-mini" type="number" min="0" data-proc-qty="'+esc(r.key)+'" value="'+r.qty+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td><select data-proc-route="'+esc(r.key)+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'>'+routes.map(function(x){return '<option value="'+x[0]+'" '+(route===x[0]?'selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></td><td>'+yen(r.qty*r.cost)+'</td></tr>';
+      var noSalesNote=r.noRecentSales&&!r.newProduct?'<small class="proc-nosales">過去2カ月販売0 → 発注しない</small>':'';var orderRuleNote=r.orderRuleLabel&&r.orderRuleLabel!=='1個単位'?'<small class="proc-order-rule">'+esc(r.orderRuleLabel)+'</small>':'';var signalNote=r.revived?'<small class="proc-revived">復活商品 → 最近の販売速度を優先</small>':(r.surged?'<small class="proc-revived">販売加速 → 最近の販売速度を優先</small>':'');var mergeNote=r.sourceRows>1?'<small>商品台帳 '+r.sourceRows+'行を商品IDで統合</small>':'';var invMergeNote=r.inventoryRows>1?'<small>在庫 '+r.inventoryRows+'行を合計</small>':'';
+      return '<tr data-proc-row="'+esc(r.key)+'"><td><span class="proc-priority p-'+urgent+'">'+urgent+'</span></td><td><strong>'+esc(r.name)+'</strong><small>'+esc(r.barcode||'JANなし')+(r.newProduct?' / 新規':'')+'</small>'+noSalesNote+orderRuleNote+signalNote+mergeNote+invMergeNote+'</td><td><code>'+esc(r.id||'未登録')+'</code></td><td>'+esc(r.supplier?supplierCfg(r.supplier).name:'未判定')+(r.tsEligible?'<small>TS代替候補</small>':'')+'</td><td>'+salesText+'</td><td>'+stockText+'</td><td>'+r.forecast.toFixed(1)+'</td><td><b>'+rate+'</b></td><td><input class="proc-mini" type="number" min="1" data-proc-pack="'+esc(r.key)+'" value="'+r.pack+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td>'+r.recommended+'</td><td><input class="proc-mini" type="number" min="0" data-proc-qty="'+esc(r.key)+'" value="'+r.qty+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td><select data-proc-route="'+esc(r.key)+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'>'+routes.map(function(x){return '<option value="'+x[0]+'" '+(route===x[0]?'selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></td><td>'+yen(r.qty*r.cost)+'</td></tr>';
     }).join('');
   }
 
@@ -528,8 +544,8 @@
     $$('[data-proc-shortage]',root).forEach(function(b){b.onclick=function(){recordShortage(b.dataset.procShortage)}});
   }
   function bindTable(root){
-    $$('[data-proc-qty]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procQty,ov=state.overrides[key]||{};ov.manualQty=Math.max(0,num(i.value));delete ov.autoExtra;state.overrides[key]=ov;persist();render()}});
-    $$('[data-proc-pack]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procPack,ov=state.overrides[key]||{};ov.pack=Math.max(1,num(i.value,1));delete ov.manualQty;delete ov.autoExtra;state.overrides[key]=ov;persist();render()}});
+    $('[data-proc-qty]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procQty,row=buildRows().find(function(r){return r.key===key}),step=row?Math.max(1,row.pack):1,raw=Math.max(0,num(i.value)),rounded=raw>0?Math.ceil(raw/step)*step:0,ov=state.overrides[key]||{};ov.manualQty=rounded;delete ov.autoExtra;state.overrides[key]=ov;persist();render()}});
+    $('[data-proc-pack]',root).forEach(function(i){i.onchange=function(){var key=i.dataset.procPack,row=buildRows().find(function(r){return r.key===key}),minStep=row&&row.orderKind==='cigarette'?10:(row&&row.orderKind!=='other'?5:1),ov=state.overrides[key]||{};ov.pack=Math.max(minStep,num(i.value,minStep));delete ov.manualQty;delete ov.autoExtra;state.overrides[key]=ov;persist();render()}});
     $$('[data-proc-route]',root).forEach(function(el){el.onchange=function(){setOverride(el.dataset.procRoute,{route:el.value,routeLocked:true});render()}});
   }
 
