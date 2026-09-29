@@ -263,20 +263,20 @@
       var forecast=daily*coverDays;
       var need=Math.max(0,forecast-stock);
       var orderRule=tobaccoOrderRule(p),step=Math.max(orderRule.step,num(ov.pack,orderRule.step));
-      var noRecentSales=sold<=0;
-      var recommended=!noRecentSales&&inventoryMatched&&need>0?Math.ceil(need/step)*step:0;
+      var noRecentSales=sold<=0,missingCost=!(num(p.cost)>0);
+      var recommended=!missingCost&&!noRecentSales&&inventoryMatched&&need>0?Math.ceil(need/step)*step:0;
       var fill=forecast>0?stock/forecast:999;
       var autoExtra=Math.max(0,num(ov.autoExtra,0));
       var manualRaw=Math.max(0,num(ov.manualQty,0));
       var manualRounded=manualRaw>0?Math.ceil(manualRaw/step)*step:0;
-      var qty=noRecentSales?0:(ov.manualQty!=null?manualRounded:recommended+autoExtra);
+      var qty=(missingCost||noRecentSales)?0:(ov.manualQty!=null?manualRounded:recommended+autoExtra);
       var isJT=String(p.note||'').trim()==='JT';
 
       out.push({
         key:k,id:id,name:p.name,barcode:p.barcode,barcodes:p.barcodes,category:p.category,
         cost:num(p.cost),price:num(p.price),note:p.note,supplier:supplier,
         sold:sold,stock:stock,forecast:forecast,need:need,fill:fill,daily:daily,
-        pack:step,orderRuleLabel:orderRule.label,orderKind:orderRule.kind,recommended:recommended,qty:qty,noRecentSales:noRecentSales,baseDaily:baseDaily,effectiveDaily:daily,coverDays:coverDays,revived:!!(signalActive&&signal.revived),surged:!!(signalActive&&signal.surged),
+        pack:step,orderRuleLabel:orderRule.label,orderKind:orderRule.kind,recommended:recommended,qty:qty,noRecentSales:noRecentSales,missingCost:missingCost,baseDaily:baseDaily,effectiveDaily:daily,coverDays:coverDays,revived:!!(signalActive&&signal.revived),surged:!!(signalActive&&signal.surged),
         inventoryMatched:inventoryMatched,salesMatched:salesMatched,
         sourceRows:p.sourceRows,inventoryRows:num(ii.rows,inventoryMatched?1:0),
         tsEligible:defaultTsEligible(p,supplier),route:ov.route||'',isJT:isJT,newProduct:false
@@ -285,7 +285,8 @@
 
     (state.manual||[]).forEach(function(p){
       var k='manual:'+p.uid,ov=state.overrides[k]||{},qty=Math.max(0,num(ov.qty,p.initialQty||1)),step=Math.max(1,num(ov.pack,p.pack||1));
-      out.push({key:k,id:p.id||'',name:p.name,barcode:p.barcode||'',barcodes:p.barcode?[p.barcode]:[],category:p.category||'新商品',cost:num(p.cost),price:num(p.price),note:'NEW',supplier:p.supplier||'',sold:0,stock:0,forecast:0,need:qty,fill:0,daily:0,pack:step,recommended:qty,qty:qty,noRecentSales:false,baseDaily:0,effectiveDaily:0,coverDays:0,revived:false,surged:false,inventoryMatched:false,salesMatched:false,sourceRows:1,inventoryRows:0,tsEligible:!!p.tsEligible,route:ov.route||'',isJT:false,newProduct:true});
+      var manualMissingCost=!(num(p.cost)>0);if(manualMissingCost)qty=0;
+      out.push({key:k,id:p.id||'',name:p.name,barcode:p.barcode||'',barcodes:p.barcode?[p.barcode]:[],category:p.category||'新商品',cost:num(p.cost),price:num(p.price),note:'NEW',supplier:p.supplier||'',sold:0,stock:0,forecast:0,need:qty,fill:0,daily:0,pack:step,recommended:qty,qty:qty,noRecentSales:false,missingCost:manualMissingCost,baseDaily:0,effectiveDaily:0,coverDays:0,revived:false,surged:false,inventoryMatched:false,salesMatched:false,sourceRows:1,inventoryRows:0,tsEligible:!!p.tsEligible,route:ov.route||'',isJT:false,newProduct:true});
     });
 
     out.sort(function(a,b){
@@ -298,6 +299,7 @@
 
   function daysUntil(dateStr){if(!dateStr)return null;var d=new Date(dateStr+'T12:00:00'),now=new Date();return Math.ceil((d-now)/86400000)}
   function suggestedRoute(r){
+    if(r.missingCost)return 'hold';
     if(r.noRecentSales&&!r.newProduct)return 'hold';
     if(r.qty<=0)return 'hold';
     if(!r.supplier||!SUPPLIERS.some(function(x){return x.id===r.supplier}))return 'hold';
@@ -309,7 +311,7 @@
     return 'direct';
   }
   function candidateBelongsToGroup(r,id){
-    if(r.newProduct||r.noRecentSales||!r.inventoryMatched||r.isJT)return false;
+    if(r.newProduct||r.noRecentSales||r.missingCost||!r.inventoryMatched||r.isJT)return false;
     var ov=state.overrides[r.key]||{};
     if(id==='TS_MIXED'){
       if(!r.tsEligible)return false;
@@ -376,7 +378,7 @@
     rows=buildRows();
     var candidateGroups={};
     rows.forEach(function(r){
-      if(r.noRecentSales||r.newProduct)return;
+      if(r.noRecentSales||r.missingCost||r.newProduct)return;
       var id=groupId(r);
       if(id==='TS_MIXED'||id.indexOf('DIRECT_')===0)candidateGroups[id]=true;
     });
@@ -477,7 +479,7 @@
   function productRows(rows,filter,search){
     filter=filter||'all';search=norm(search||'');
     return rows.filter(function(r){
-      if(r.recommended<=0&&!r.newProduct&&!r.noRecentSales&&((state.inventory||[]).length===0||r.inventoryMatched))return false;
+      if(r.recommended<=0&&!r.newProduct&&!r.noRecentSales&&!r.missingCost&&((state.inventory||[]).length===0||r.inventoryMatched))return false;
       if(filter==='UNKNOWN'&&r.supplier)return false;
       if(filter!=='all'&&filter!=='UNKNOWN'&&r.supplier!==filter)return false;
       if(search&&norm(r.name+' '+r.id).indexOf(search)<0)return false;
@@ -489,8 +491,8 @@
       routes.push(['hold','見送り']);
       var stockText=((state.inventory||[]).length&&!r.inventoryMatched&&!r.newProduct)?'<span class="proc-unmatched">未照合</span>':r.stock.toFixed(1);
       var salesText=((state.sales||[]).length&&!r.salesMatched&&!r.newProduct)?'<span class="proc-unmatched">未照合</span>':r.sold.toFixed(0);
-      var noSalesNote=r.noRecentSales&&!r.newProduct?'<small class="proc-nosales">過去2カ月販売0 → 発注しない</small>':'';var orderRuleNote=r.orderRuleLabel&&r.orderRuleLabel!=='1個単位'?'<small class="proc-order-rule">'+esc(r.orderRuleLabel)+'</small>':'';var signalNote=r.revived?'<small class="proc-revived">復活商品 → 最近の販売速度を優先</small>':(r.surged?'<small class="proc-revived">販売加速 → 最近の販売速度を優先</small>':'');var mergeNote=r.sourceRows>1?'<small>商品台帳 '+r.sourceRows+'行を商品IDで統合</small>':'';var invMergeNote=r.inventoryRows>1?'<small>在庫 '+r.inventoryRows+'行を合計</small>':'';
-      return '<tr data-proc-row="'+esc(r.key)+'"><td><span class="proc-priority p-'+urgent+'">'+urgent+'</span></td><td><strong>'+esc(r.name)+'</strong><small>'+esc(r.barcode||'JANなし')+(r.newProduct?' / 新規':'')+'</small>'+noSalesNote+orderRuleNote+signalNote+mergeNote+invMergeNote+'</td><td><code>'+esc(r.id||'未登録')+'</code></td><td>'+esc(r.supplier?supplierCfg(r.supplier).name:'未判定')+(r.tsEligible?'<small>TS代替候補</small>':'')+'</td><td>'+salesText+'</td><td>'+stockText+'</td><td>'+r.forecast.toFixed(1)+'</td><td><b>'+rate+'</b></td><td><input class="proc-mini" type="number" min="1" data-proc-pack="'+esc(r.key)+'" value="'+r.pack+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td>'+r.recommended+'</td><td><input class="proc-mini" type="number" min="0" data-proc-qty="'+esc(r.key)+'" value="'+r.qty+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td><select data-proc-route="'+esc(r.key)+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'>'+routes.map(function(x){return '<option value="'+x[0]+'" '+(route===x[0]?'selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></td><td>'+yen(r.qty*r.cost)+'</td></tr>';
+      var noSalesNote=r.noRecentSales&&!r.newProduct?'<small class="proc-nosales">過去2カ月販売0 → 発注しない</small>':'';var missingCostNote=r.missingCost?'<small class="proc-cost-missing">原価未登録 → 発注対象外</small>':'';var orderRuleNote=r.orderRuleLabel&&r.orderRuleLabel!=='1個単位'?'<small class="proc-order-rule">'+esc(r.orderRuleLabel)+'</small>':'';var signalNote=r.revived?'<small class="proc-revived">復活商品 → 最近の販売速度を優先</small>':(r.surged?'<small class="proc-revived">販売加速 → 最近の販売速度を優先</small>':'');var mergeNote=r.sourceRows>1?'<small>商品台帳 '+r.sourceRows+'行を商品IDで統合</small>':'';var invMergeNote=r.inventoryRows>1?'<small>在庫 '+r.inventoryRows+'行を合計</small>':'';
+      return '<tr data-proc-row="'+esc(r.key)+'"><td><span class="proc-priority p-'+urgent+'">'+urgent+'</span></td><td><strong>'+esc(r.name)+'</strong><small>'+esc(r.barcode||'JANなし')+(r.newProduct?' / 新規':'')+'</small>'+noSalesNote+missingCostNote+orderRuleNote+signalNote+mergeNote+invMergeNote+'</td><td><code>'+esc(r.id||'未登録')+'</code></td><td>'+esc(r.supplier?supplierCfg(r.supplier).name:'未判定')+(r.tsEligible?'<small>TS代替候補</small>':'')+'</td><td>'+salesText+'</td><td>'+stockText+'</td><td>'+r.forecast.toFixed(1)+'</td><td><b>'+rate+'</b></td><td><input class="proc-mini" type="number" min="1" data-proc-pack="'+esc(r.key)+'" value="'+r.pack+'" '+(r.missingCost||(r.noRecentSales&&!r.newProduct)?'disabled':'')+'></td><td>'+r.recommended+'</td><td><input class="proc-mini" type="number" min="0" data-proc-qty="'+esc(r.key)+'" value="'+r.qty+'" '+(r.missingCost||(r.noRecentSales&&!r.newProduct)?'disabled':'')+'></td><td><select data-proc-route="'+esc(r.key)+'" '+(r.missingCost||(r.noRecentSales&&!r.newProduct)?'disabled':'')+'>'+routes.map(function(x){return '<option value="'+x[0]+'" '+(route===x[0]?'selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></td><td>'+yen(r.qty*r.cost)+'</td></tr>';
     }).join('');
   }
 
@@ -563,7 +565,7 @@
   }
 
   function orderData(group){
-    var rows=buildRows().filter(function(r){return r.qty>0&&groupId(r)===group}).map(function(r){
+    var rows=buildRows().filter(function(r){return r.qty>0&&r.cost>0&&!r.missingCost&&groupId(r)===group}).map(function(r){
       var qty=Math.max(0,num(r.qty)),cost=Math.max(0,num(r.cost)),price=Math.max(0,num(r.price));
       return Object.assign({},r,{qty:qty,cost:cost,price:price,lineTotal:qty*cost});
     });
