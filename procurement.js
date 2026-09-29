@@ -227,11 +227,11 @@
   function uploadCard(type,label,count){return '<label class="proc-upload-card"><strong>'+esc(label)+'</strong><span>'+(count?count.toLocaleString()+'件 読込済み':'CSVを選択')+'</span><input type="file" data-proc-csv="'+type+'" accept=".csv,text/csv" hidden></label>'}
 
   function settingsPanel(){
-    var s=state.settings;
-    return '<details class="panel proc-block proc-settings"><summary><strong>② 発注条件・仕入先設定</strong><span>不足率 / 送料無料 / FAX / JT定期便</span></summary>'+
+    var st=state.settings;
+    return '<details class="panel proc-block proc-settings"><summary><strong>② 発注条件・仕入先設定</strong><span>不足率 / 送料無料 / 送料 / 締切 / 支払 / FAX / JT定期便</span></summary>'+
       '<div class="proc-settings-grid">'+
-        field('販売実績日数','procSalesDays',s.salesDays||60,'number')+field('在庫確保日数','procTargetDays',s.targetDays||45,'number')+field('欠品想定率（%）','procRisk',s.shortageRisk||5,'number')+field('次回JT定期配送日','procJtDate',s.nextJtRegularDate||'','date')+field('Mac FAX Bridge','procBridgeUrl',s.bridgeUrl||'http://127.0.0.1:8765','text')+
-      '</div><div class="proc-supplier-settings">'+SUPPLIERS.map(function(x){var c=supplierCfg(x.id);return '<div class="proc-supplier-setting"><div><strong>'+esc(c.name)+'</strong><small>'+esc(c.note||'')+'</small></div><label>送料無料<input type="number" data-supplier-free="'+x.id+'" value="'+esc(c.free||'')+'" placeholder="未設定"></label><label>最低発注<input type="number" data-supplier-min="'+x.id+'" value="'+esc(c.min||'')+'"></label><label>FAX<input data-supplier-fax="'+x.id+'" value="'+esc(c.fax||'')+'" placeholder="未設定"></label></div>'}).join('')+'</div><div class="proc-actions"><button class="primary-btn" id="procSaveSettings">設定を保存</button></div></details>';
+        field('販売実績日数','procSalesDays',st.salesDays||60,'number')+field('在庫確保日数','procTargetDays',st.targetDays||45,'number')+field('欠品想定率（%）','procRisk',st.shortageRisk||5,'number')+field('次回JT定期配送日','procJtDate',st.nextJtRegularDate||'','date')+field('Mac FAX Bridge','procBridgeUrl',st.bridgeUrl||'http://127.0.0.1:8765','text')+
+      '</div><div class="proc-supplier-settings">'+SUPPLIERS.map(function(x){var c=supplierCfg(x.id);return '<div class="proc-supplier-setting"><div class="proc-supplier-main"><strong>'+esc(c.name)+'</strong><small>'+esc(c.note||'')+'</small></div><label>送料無料ライン<input type="number" data-supplier-free="'+x.id+'" value="'+esc(c.free||'')+'" placeholder="未設定"></label><label>最低発注<input type="number" data-supplier-min="'+x.id+'" value="'+esc(c.min||'')+'"></label><label>通常送料<input type="number" data-supplier-shipping="'+x.id+'" value="'+esc(c.shipping||'')+'"></label><label>判定基準<select data-supplier-basis="'+x.id+'"><option value="" '+(!c.basis?'selected':'')+'>未設定</option><option value="下代" '+(c.basis==='下代'?'selected':'')+'>下代</option><option value="上代" '+(c.basis==='上代'?'selected':'')+'>上代</option></select></label><label>発注締切<input data-supplier-cutoff="'+x.id+'" value="'+esc(c.cutoff||'')+'" placeholder="例 12:00"></label><label>配送目安<input data-supplier-delivery="'+x.id+'" value="'+esc(c.delivery||'')+'" placeholder="例 翌々日"></label><label>注文方法<input data-supplier-method="'+x.id+'" value="'+esc(c.method||'')+'"></label><label>支払方法<input data-supplier-payment="'+x.id+'" value="'+esc(c.payment||'')+'"></label><label>FAX<input data-supplier-fax="'+x.id+'" value="'+esc(c.fax||'')+'" placeholder="未設定"></label><label class="proc-checkline"><input type="checkbox" data-supplier-samples="'+x.id+'" '+(c.samples?'checked':'')+'><span>サンプル期待</span></label><label class="proc-checkline"><input type="checkbox" data-supplier-ts="'+x.id+'" '+(c.tsFallback?'checked':'')+'><span>たばこはTS代替候補</span></label></div>'}).join('')+'</div><div class="proc-actions"><button class="primary-btn" id="procSaveSettings">設定を保存</button></div></details>';
   }
   function field(label,id,value,type){return '<label><span>'+esc(label)+'</span><input id="'+id+'" type="'+type+'" value="'+esc(value)+'"></label>'}
 
@@ -269,7 +269,29 @@
     $$('[data-proc-csv]',root).forEach(function(inp){inp.onchange=function(){var file=inp.files&&inp.files[0];if(!file)return;decodeFile(file).then(function(text){var parsed=parseCsvText(text),type=inp.dataset.procCsv;if(type==='master')state.master=parseMaster(parsed);if(type==='inventory')state.inventory=parseInventory(parsed);if(type==='sales')state.sales=parseSales(parsed);persist();applyAutoPlan(buildRows());render()}).catch(function(e){alert('CSV読込に失敗しました: '+e.message)})}});
     var clear=$('#procClearCsv',root);if(clear)clear.onclick=function(){if(!confirm('読み込んだ3CSVをクリアしますか？新規商品・設定は残します。'))return;state.master=[];state.inventory=[];state.sales=[];state.overrides={};persist();render()};
     var auto=$('#procAutoPlan',root);if(auto)auto.onclick=function(){applyAutoPlan(buildRows());render()};
-    var saveBtn=$('#procSaveSettings',root);if(saveBtn)saveBtn.onclick=function(){state.settings.salesDays=num($('#procSalesDays',root).value,60);state.settings.targetDays=num($('#procTargetDays',root).value,45);state.settings.shortageRisk=num($('#procRisk',root).value,5);state.settings.nextJtRegularDate=$('#procJtDate',root).value;state.settings.bridgeUrl=$('#procBridgeUrl',root).value.trim()||'http://127.0.0.1:8765';SUPPLIERS.forEach(function(s){state.supplierSettings[s.id]=Object.assign({},state.supplierSettings[s.id]||{},{free:num($('[data-supplier-free="'+s.id+'"]',root).value),min:num($('[data-supplier-min="'+s.id+'"]',root).value),fax:$('[data-supplier-fax="'+s.id+'"]',root).value.trim()})});persist();applyAutoPlan(buildRows());render();alert('発注条件を保存しました')};
+    var saveBtn=$('#procSaveSettings',root);if(saveBtn)saveBtn.onclick=function(){
+      state.settings.salesDays=num($('#procSalesDays',root).value,60);
+      state.settings.targetDays=num($('#procTargetDays',root).value,45);
+      state.settings.shortageRisk=num($('#procRisk',root).value,5);
+      state.settings.nextJtRegularDate=$('#procJtDate',root).value;
+      state.settings.bridgeUrl=$('#procBridgeUrl',root).value.trim()||'http://127.0.0.1:8765';
+      SUPPLIERS.forEach(function(sp){
+        state.supplierSettings[sp.id]=Object.assign({},state.supplierSettings[sp.id]||{},{
+          free:num($('[data-supplier-free="'+sp.id+'"]',root).value),
+          min:num($('[data-supplier-min="'+sp.id+'"]',root).value),
+          shipping:num($('[data-supplier-shipping="'+sp.id+'"]',root).value),
+          basis:$('[data-supplier-basis="'+sp.id+'"]',root).value,
+          cutoff:$('[data-supplier-cutoff="'+sp.id+'"]',root).value.trim(),
+          delivery:$('[data-supplier-delivery="'+sp.id+'"]',root).value.trim(),
+          method:$('[data-supplier-method="'+sp.id+'"]',root).value.trim(),
+          payment:$('[data-supplier-payment="'+sp.id+'"]',root).value.trim(),
+          fax:$('[data-supplier-fax="'+sp.id+'"]',root).value.trim(),
+          samples:$('[data-supplier-samples="'+sp.id+'"]',root).checked,
+          tsFallback:$('[data-supplier-ts="'+sp.id+'"]',root).checked
+        });
+      });
+      persist();applyAutoPlan(buildRows());render();alert('発注条件を保存しました');
+    };
     var newBtn=$('#procNewProduct',root);if(newBtn)newBtn.onclick=openNewProduct;
     var search=$('#procSearch',root),activeFilter='all';
     function redrawTable(){var body=$('#procTableBody',root);if(body){body.innerHTML=productRows(buildRows(),activeFilter,search?search.value:'');bindTable(body)}}
