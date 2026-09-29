@@ -146,7 +146,7 @@
       var key='id:'+String(x.id).trim(),before=prev[key],oldQty=before?num(before.qty):0,newQty=num(x.qty),prior=existing[key]||null;
       if(before&&newQty===oldQty&&prior&&Number(prior.expiresAt||0)>now){signals[key]=prior;return}
       var delta=Math.max(0,newQty-oldQty),base=newQty/Math.max(1,num(state.settings.salesDays,60)),boost=delta>0?delta/elapsedDays:0;
-      var revived=!!before&&oldQty<=0&&newQty>0;
+      var revived=!!last&&oldQty<=0&&newQty>0;
       var surged=!revived&&delta>=2&&boost>base*1.5;
       if(revived||surged){
         signals[key]={revived:revived,surged:surged,previousQty:oldQty,currentQty:newQty,delta:delta,boostDaily:Math.max(base,boost),detectedAt:now,expiresAt:now+14*86400000};
@@ -293,9 +293,18 @@
     return 'direct';
   }
   function candidateBelongsToGroup(r,id){
-    if(r.newProduct||r.noRecentSales||!r.inventoryMatched||r.qty<0)return false;
-    if(id==='TS_MIXED')return r.tsEligible&&routeOf(r)==='ts_mixed';
-    if(id.indexOf('DIRECT_')===0)return r.supplier===id.replace('DIRECT_','')&&routeOf(r)==='direct';
+    if(r.newProduct||r.noRecentSales||!r.inventoryMatched||r.isJT)return false;
+    var ov=state.overrides[r.key]||{};
+    if(id==='TS_MIXED'){
+      if(!r.tsEligible)return false;
+      if(ov.routeLocked&&ov.route!=='ts_mixed')return false;
+      return true;
+    }
+    if(id.indexOf('DIRECT_')===0){
+      if(r.supplier!==id.replace('DIRECT_',''))return false;
+      if(ov.routeLocked&&ov.route!=='direct')return false;
+      return true;
+    }
     return false;
   }
   function topUpGroupToFreeShipping(rows,id){
@@ -324,6 +333,7 @@
         var step=Math.max(1,r.pack),allowed=Math.floor(maxQty/step)*step;
         if(currentQty+step>allowed)continue;
         ov.autoExtra=Math.max(0,num(ov.autoExtra,0))+step;
+        if(!ov.routeLocked)ov.route=(id==='TS_MIXED'?'ts_mixed':'direct');
         state.overrides[r.key]=ov;
         r.qty+=step;
         subtotal+=step*(String(cfg.basis||'')==='上代'?num(r.price):num(r.cost));
@@ -369,6 +379,16 @@
     var useRetail=String((cfg&&cfg.basis)||'')==='上代';
     return items.reduce(function(a,r){return a+r.qty*(useRetail?num(r.price):num(r.cost))},0);
   }
+  function weeklyPotentialSpend(id,rows){
+    var supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):{},days=Math.max(1,num(state.settings.orderCycleDays,7)),useRetail=String(cfg.basis||'')==='上代';
+    return (rows||[]).filter(function(r){
+      if(r.newProduct||r.noRecentSales||r.isJT||r.effectiveDaily<=0)return false;
+      if(id==='TS_MIXED')return !!r.tsEligible;
+      if(id.indexOf('DIRECT_')===0)return r.supplier===id.replace('DIRECT_','');
+      return false;
+    }).reduce(function(a,r){return a+r.effectiveDaily*days*(useRetail?num(r.price):num(r.cost))},0);
+  }
+
   function groupStats(id,items){
     var supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):{},total=items.reduce(function(a,r){return a+r.qty*r.cost},0),thresholdAmount=thresholdSubtotal(items,cfg),threshold=thresholdForGroup(id),minimum=num(cfg.min),risk=Math.max(0,Math.min(100,num(state.settings.shortageRisk,5)))/100,riskAdjusted=thresholdAmount*(1-risk),bufferPct=Math.max(0,num(state.settings.freeBufferPct,10)),bufferTarget=threshold*(1+bufferPct/100);
     var basisLabel=cfg.basis?(' / '+cfg.basis+'基準'):'',status='条件未設定';
@@ -424,13 +444,14 @@
 
   function summaryPanel(rows){
     var gs=groups(rows),ids=Object.keys(gs).sort(function(a,b){if(a==='HOLD')return 1;if(b==='HOLD')return -1;return a.localeCompare(b,'ja')});
-    return '<section class="proc-block"><div class="proc-title-row"><div><h3>③ 今回の推奨発注案</h3><p>人間が最終確認してから注文書/FAXへ進みます。</p></div><div class="proc-actions"><button class="ghost" id="procNewProduct">＋ 新規商品</button><button class="primary-btn" id="procFaxAll">FAX可能分を一括送信</button></div></div>'+(ids.length?'<div class="proc-group-grid">'+ids.map(function(id){return groupCard(id,gs[id])}).join('')+'</div>':'<div class="panel proc-empty">CSVを3つ読み込むと発注案を表示します。</div>')+'</section>';
+    return '<section class="proc-block"><div class="proc-title-row"><div><h3>③ 今回の推奨発注案</h3><p>人間が最終確認してから注文書/FAXへ進みます。</p></div><div class="proc-actions"><button class="ghost" id="procNewProduct">＋ 新規商品</button><button class="primary-btn" id="procFaxAll">FAX可能分を一括送信</button></div></div>'+(ids.length?'<div class="proc-group-grid">'+ids.map(function(id){return groupCard(id,gs[id],rows)}).join('')+'</div>':'<div class="panel proc-empty">CSVを3つ読み込むと発注案を表示します。</div>')+'</section>';
   }
-  function groupCard(id,items){
-    var st=groupStats(id,items),supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):null,danger=st.status.indexOf('リスク')>=0||st.status.indexOf('不足')>=0;
+  function groupCard(id,items,allRows){
+    var st=groupStats(id,items),supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):null,weekly=weeklyPotentialSpend(id,allRows),threshold=thresholdForGroup(id),danger=st.status.indexOf('リスク')>=0||st.status.indexOf('不足')>=0;
     var top=items.slice().sort(function(a,b){return a.fill-b.fill}).slice(0,4);
     var meta=cfg?['注文 '+(cfg.method||'未設定'),cfg.cutoff?('締切 '+cfg.cutoff):'',cfg.delivery?('配送 '+cfg.delivery):'',cfg.samples?'サンプル期待あり':''].filter(Boolean).join(' / '):'';
-    return '<article class="proc-group '+(danger?'danger':'')+'"><div class="proc-group-head"><div><span>'+esc(groupName(id))+'</span><strong>'+yen(st.total)+'</strong></div><span class="proc-status">'+esc(st.status)+'</span></div>'+(meta?'<div class="proc-group-meta">'+esc(meta)+'</div>':'')+'<div class="proc-group-items">'+top.map(function(r){return '<div><span>'+esc(r.name)+'</span><b>'+r.qty+'</b></div>'}).join('')+(items.length>4?'<small>ほか '+(items.length-4)+'商品</small>':'')+'</div><div class="proc-group-actions">'+(id!=='HOLD'&&id!=='JT_REGULAR'?'<button class="ghost" data-proc-doc="'+esc(id)+'">注文書</button>':'')+(cfg&&cfg.fax&&id!=='HOLD'&&id!=='JT_REGULAR'?'<button class="primary-btn" data-proc-fax="'+esc(id)+'">FAX送信</button>':'')+(id!=='HOLD'?'<button class="ghost" data-proc-sent="'+esc(id)+'">注文済みにする</button>':'')+'</div></article>';
+    var sustainability=threshold>0&&weekly<threshold?'<div class="proc-weekly-warning">週需要見込み '+yen(weekly)+' / 送料無料 '+yen(threshold)+'。毎週送料無料は前倒しだけでは持続しにくいため、TS集約・発注週調整の候補です。</div>':'';
+    return '<article class="proc-group '+(danger?'danger':'')+'"><div class="proc-group-head"><div><span>'+esc(groupName(id))+'</span><strong>'+yen(st.total)+'</strong></div><span class="proc-status">'+esc(st.status)+'</span></div>'+(meta?'<div class="proc-group-meta">'+esc(meta)+'</div>':'')+sustainability+'<div class="proc-group-items">'+top.map(function(r){return '<div><span>'+esc(r.name)+'</span><b>'+r.qty+'</b></div>'}).join('')+(items.length>4?'<small>ほか '+(items.length-4)+'商品</small>':'')+'</div><div class="proc-group-actions">'+(id!=='HOLD'&&id!=='JT_REGULAR'?'<button class="ghost" data-proc-doc="'+esc(id)+'">注文書</button>':'')+(cfg&&cfg.fax&&id!=='HOLD'&&id!=='JT_REGULAR'?'<button class="primary-btn" data-proc-fax="'+esc(id)+'">FAX送信</button>':'')+(id!=='HOLD'?'<button class="ghost" data-proc-sent="'+esc(id)+'">注文済みにする</button>':'')+'</div></article>';
   }
 
   function productPanel(rows){
