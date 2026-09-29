@@ -4,3 +4,5 @@
 @media(max-width:560px){.proc-kpis{grid-template-columns:1fr 1fr}.proc-kpis strong{font-size:19px}.proc-group-grid{grid-template-columns:1fr}.proc-title-row{align-items:flex-start;flex-direction:column}.proc-title-row .proc-actions{width:100%;justify-content:stretch}.proc-title-row .proc-actions button{flex:1}.proc-settings-grid{grid-template-columns:1fr}.proc-supplier-setting{grid-template-columns:1fr}.proc-supplier-setting>div{grid-column:auto}.proc-new-form{grid-template-columns:1fr}.proc-history>div{grid-template-columns:1fr auto}.proc-history small{grid-column:1}.bottom-nav .nav-item{min-width:52px}.proc-table-wrap{margin-left:-18px;margin-right:-18px}}
 
 .proc-unmatched{display:inline-block;background:#fde6dd;color:#8d3d24;font-weight:800;border-radius:999px;padding:4px 7px;font-size:10px}
+
+.proc-nosales{display:block!important;color:#8a4a3b!important;font-weight:800;margin-top:5px!important}.proc-table input:disabled,.proc-table select:disabled{opacity:.45;cursor:not-allowed;background:#f2efec}
