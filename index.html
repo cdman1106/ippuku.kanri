@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>いっぷく 店舗管理</title>
-<link rel="stylesheet" href="./styles.css?v=20260923-01">\n<link rel="stylesheet" href="./procurement.css?v=20260930-10">
+<link rel="stylesheet" href="./styles.css?v=20260923-01">
 </head>
 <body>
 <div id="app">
@@ -135,14 +135,6 @@
       <div id="inventoryShopFilters" class="inventory-shop-filters"></div>
       <div id="inventoryList" class="inventory-list"></div>
     </section>
-
-    <section class="page" data-page="procurement">
-      <div class="section-head">
-        <div><h2>たばこ・喫煙具 発注</h2><p>Airレジ3CSVから不足率・推奨数・仕入先別発注案を自動作成します。</p></div>
-      </div>
-      <div id="procurementApp"></div>
-    </section>
-
     <section class="page" data-page="reserve">
       <div class="section-head"><div><h2>取り置き管理</h2><p>銘柄・個数・来店予定日をまとめて管理</p></div><button class="primary-btn" id="addReserveBtn">＋ 取り置き追加</button></div>
       <div id="reserveList" class="reserve-list"></div>
@@ -179,7 +171,7 @@
     <button class="nav-item" data-go="seats"><span>▦</span><small>座席</small></button>
     <button class="nav-item" data-go="orders"><span>☷</span><small>注文</small></button>
     <button class="nav-item" data-go="analytics"><span>↗</span><small>分析</small></button>
-    <button class="nav-item" data-go="inventory"><span>□</span><small>在庫</small></button>\n    <button class="nav-item" data-go="procurement"><span>⇄</span><small>発注</small></button>
+    <button class="nav-item" data-go="inventory"><span>□</span><small>在庫</small></button>
     <button class="nav-item" data-go="reserve"><span>☆</span><small>取置</small></button>
     <button class="nav-item" data-go="settings"><span>⚙</span><small>設定</small></button>
   </nav>
@@ -202,6 +194,6 @@
 
 <script src="./sales-data.js?v=20260919-1"></script>
 <script src="./menu-data.js?v=20260919-13"></script>
-<script src="./app.js?v=20260929-01"></script>\n<script src="./procurement.js?v=20260930-11"></script>
+<script src="./app.js?v=20260929-01"></script>
 </body>
 </html>
