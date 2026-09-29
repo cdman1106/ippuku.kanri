@@ -570,16 +570,16 @@
     var search=$('#procSearch',root),activeFilter='all';
     function redrawTable(){var body=$('#procTableBody',root);if(body){body.innerHTML=productRows(buildRows(),activeFilter,search?search.value:'');bindTable(body)}}
     if(search)search.oninput=redrawTable;
-    $('[data-proc-supplier-filter]',root).forEach(function(b){b.onclick=function(){$('[data-proc-supplier-filter]',root).forEach(function(x){x.classList.remove('active')});b.classList.add('active');activeFilter=b.dataset.procSupplierFilter;redrawTable()}});
+    $$('[data-proc-supplier-filter]',root).forEach(function(b){b.onclick=function(){$$('[data-proc-supplier-filter]',root).forEach(function(x){x.classList.remove('active')});b.classList.add('active');activeFilter=b.dataset.procSupplierFilter;redrawTable()}});
     var includeAll=$('#procIncludeAll',root);if(includeAll)includeAll.onclick=function(){buildRows().forEach(function(r){if(!r.missingCost&&(!r.noRecentSales||r.newProduct)&&r.qty>0){var ov=state.overrides[r.key]||{};ov.excludeFromOrder=false;state.overrides[r.key]=ov}});persist();render()};
     var excludeAll=$('#procExcludeAll',root);if(excludeAll)excludeAll.onclick=function(){buildRows().forEach(function(r){if(r.qty>0){var ov=state.overrides[r.key]||{};ov.excludeFromOrder=true;state.overrides[r.key]=ov}});persist();render()};
     var includeRecommended=$('#procIncludeRecommended',root);if(includeRecommended)includeRecommended.onclick=function(){buildRows().forEach(function(r){var ov=state.overrides[r.key]||{};ov.excludeFromOrder=!(r.qty>0&&!r.missingCost&&(!r.noRecentSales||r.newProduct)&&r.recommended>0);state.overrides[r.key]=ov});persist();render()};
-    try{$('[data-proc-doc]',root).forEach(function(b){b.onclick=function(){openOrderDocument(b.dataset.procDoc)}})}catch(e){console.error('order document binding',e)}
+    try{$$('[data-proc-doc]',root).forEach(function(b){b.onclick=function(){openOrderDocument(b.dataset.procDoc)}})}catch(e){console.error('order document binding',e)}
     try{bindTable(root)}catch(e){console.error('procurement table binding',e)}
-    try{$('[data-proc-fax]',root).forEach(function(b){b.onclick=function(){sendFaxGroup(b.dataset.procFax)}})}catch(e){console.error('fax binding',e)}
-    try{$('[data-proc-sent]',root).forEach(function(b){b.onclick=function(){recordSent(b.dataset.procSent)}})}catch(e){console.error('sent binding',e)}
+    try{$$('[data-proc-fax]',root).forEach(function(b){b.onclick=function(){sendFaxGroup(b.dataset.procFax)}})}catch(e){console.error('fax binding',e)}
+    try{$$('[data-proc-sent]',root).forEach(function(b){b.onclick=function(){recordSent(b.dataset.procSent)}})}catch(e){console.error('sent binding',e)}
     var faxAll=$('#procFaxAll',root);if(faxAll)faxAll.onclick=sendFaxAll;
-    try{$('[data-proc-shortage]',root).forEach(function(b){b.onclick=function(){recordShortage(b.dataset.procShortage)}})}catch(e){console.error('shortage binding',e)}
+    try{$$('[data-proc-shortage]',root).forEach(function(b){b.onclick=function(){recordShortage(b.dataset.procShortage)}})}catch(e){console.error('shortage binding',e)}
   }
   function bindTable(root){
     $$('[data-proc-include]',root).forEach(function(el){el.onchange=function(){
