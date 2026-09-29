@@ -153,6 +153,7 @@
   function daysUntil(dateStr){if(!dateStr)return null;var d=new Date(dateStr+'T12:00:00'),now=new Date();return Math.ceil((d-now)/86400000)}
   function suggestedRoute(r){
     if(r.qty<=0)return 'hold';
+    if(!r.supplier||!SUPPLIERS.some(function(x){return x.id===r.supplier}))return 'hold';
     if(r.isJT){
       var days=daysUntil(state.settings.nextJtRegularDate), cover=r.daily>0?r.stock/r.daily:999;
       if(days!=null&&days>=0&&cover>=days+2)return 'jt_regular';
