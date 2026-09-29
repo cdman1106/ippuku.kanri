@@ -18,14 +18,14 @@
   if(!state.orders)state.orders=[];
 
   var SUPPLIERS=[
-    {id:'TS',name:'TSネットワーク',codes:['JT','TS'],free:30000,min:0,method:'Web / 指定発注',fax:'',samples:false,tsFallback:false,note:'混合注文は30,000円以上で送料無料。平日12時までの注文は原則翌々日着。JTは別倉庫・別ルール。'},
-    {id:'AY',name:'秋山産業',codes:['AY','AK'],free:0,min:0,method:'FAX',fax:'03-5434-2050',samples:true,tsFallback:true,note:'直接発注とTS混合の比較対象。送料無料条件は実際の取引条件を設定してください。'},
-    {id:'TG',name:'柘製作所',codes:['TG'],free:0,min:0,method:'FAX',fax:'03-3845-1225',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。喫煙具は原則直接。'},
-    {id:'HY',name:'春山商事',codes:['HY'],free:0,min:0,method:'FAX',fax:'03-3832-1486',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。喫煙具は原則直接。'},
-    {id:'IC',name:'インターコンチネンタル商事',codes:['IC'],free:0,min:0,method:'FAX / メール',fax:'03-3586-6716',samples:false,tsFallback:true,note:'TS代替可否は商品ごとに最終確認。'},
-    {id:'IM',name:'日本たばこアイメックス',codes:['IM'],free:0,min:0,method:'Web / FAX',fax:'',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。'},
-    {id:'MS',name:'モリソン商会',codes:['MS'],free:0,min:0,method:'Web / FAX',fax:'03-5828-5912',samples:false,tsFallback:false,note:'RAW等。取引条件を設定してください。'},
-    {id:'SM',name:'Smith Corporation / ロックリンク合同会社',codes:['SM'],free:0,min:0,method:'Web / 要確認',fax:'',samples:false,tsFallback:false,note:'TSUTSUMI、パピヨン、コピ、バイオリン、バージンロイヤル等。FAX可否は未確認。'}
+    {id:'TS',name:'TSネットワーク',codes:['JT','TS'],free:30000,min:0,basis:'下代',shipping:0,cutoff:'平日12:00',delivery:'原則翌々日',method:'Web / 指定発注',payment:'取引条件による',fax:'',samples:false,tsFallback:false,note:'混合注文は30,000円以上で送料無料。JTは別倉庫・別ルール。'},
+    {id:'AY',name:'秋山産業',codes:['AY','AK'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-5434-2050',samples:true,tsFallback:true,note:'直接発注とTS混合の比較対象。送料無料条件は実際の取引条件を設定してください。'},
+    {id:'TG',name:'柘製作所',codes:['TG'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-3845-1225',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。喫煙具は原則直接。'},
+    {id:'HY',name:'春山商事',codes:['HY'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX',payment:'',fax:'03-3832-1486',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。喫煙具は原則直接。'},
+    {id:'IC',name:'インターコンチネンタル商事',codes:['IC'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'FAX / メール',payment:'',fax:'03-3586-6716',samples:false,tsFallback:true,note:'TS代替可否は商品ごとに最終確認。'},
+    {id:'IM',name:'日本たばこアイメックス',codes:['IM'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / FAX',payment:'',fax:'',samples:true,tsFallback:true,note:'たばこはTS混合へ回せる商品あり。'},
+    {id:'MS',name:'モリソン商会',codes:['MS'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / FAX',payment:'',fax:'03-5828-5912',samples:false,tsFallback:false,note:'RAW等。取引条件を設定してください。'},
+    {id:'SM',name:'Smith Corporation / ロックリンク合同会社',codes:['SM'],free:0,min:0,basis:'',shipping:0,cutoff:'',delivery:'',method:'Web / 要確認',payment:'',fax:'',samples:false,tsFallback:false,note:'TSUTSUMI、パピヨン、コピ、バイオリン、バージンロイヤル等。FAX可否は未確認。'}
   ];
   var CODE_MAP={};
   SUPPLIERS.forEach(function(s){s.codes.forEach(function(c){CODE_MAP[c]=s.id})});
@@ -128,7 +128,7 @@
   function defaultTsEligible(p,supplier){
     var ov=state.overrides[keyOf(p)]||{};
     if(typeof ov.tsEligible==='boolean')return ov.tsEligible;
-    return ['AY','TG','HY','IM','IC'].indexOf(supplier)>=0&&looksTobacco(p);
+    return !!supplierCfg(supplier).tsFallback&&looksTobacco(p);
   }
 
   function buildRows(){
@@ -168,7 +168,8 @@
       var route=suggestedRoute(r);
       if(route==='direct'&&r.tsEligible){
         var cfg=supplierCfg(r.supplier);
-        var supplierTotal=rows.filter(function(x){return x.supplier===r.supplier&&x.qty>0&&!x.isJT}).reduce(function(a,x){return a+x.qty*x.cost},0);
+        var supplierItems=rows.filter(function(x){return x.supplier===r.supplier&&x.qty>0&&!x.isJT});
+        var supplierTotal=thresholdSubtotal(supplierItems,cfg);
         if(cfg.free>0&&supplierTotal<cfg.free)route='ts_mixed';
       }
       state.overrides[k]=Object.assign({},ov,{route:route});
@@ -182,14 +183,23 @@
 
   function groups(rows){var m={};rows.filter(function(r){return r.qty>0}).forEach(function(r){var id=groupId(r);(m[id]||(m[id]=[])).push(r)});return m}
   function thresholdForGroup(id){if(id==='TS_MIXED')return num(supplierCfg('TS').free,30000);if(id==='JT_REGULAR'||id==='JT_NORMAL'||id==='HOLD')return 0;return num(supplierCfg(groupSupplier(id)).free)}
+  function thresholdSubtotal(items,cfg){
+    var useRetail=String((cfg&&cfg.basis)||'')==='上代';
+    return items.reduce(function(a,r){return a+r.qty*(useRetail?num(r.price):num(r.cost))},0);
+  }
   function groupStats(id,items){
-    var total=items.reduce(function(a,r){return a+r.qty*r.cost},0), threshold=thresholdForGroup(id), risk=Math.max(0,Math.min(100,num(state.settings.shortageRisk,5)))/100, riskAdjusted=total*(1-risk);
-    var status='条件未設定';
+    var supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):{},total=items.reduce(function(a,r){return a+r.qty*r.cost},0),thresholdAmount=thresholdSubtotal(items,cfg),threshold=thresholdForGroup(id),minimum=num(cfg.min),risk=Math.max(0,Math.min(100,num(state.settings.shortageRisk,5)))/100,riskAdjusted=thresholdAmount*(1-risk);
+    var basisLabel=cfg.basis?(' / '+cfg.basis+'基準'):'',status='条件未設定';
     if(id==='JT_REGULAR')status='定期配送なら送料無料';
     else if(id==='JT_NORMAL')status='通常送料あり';
     else if(id==='HOLD')status='発注しない';
-    else if(threshold>0){if(total<threshold)status='送料無料まで '+yen(threshold-total)+' 不足';else if(riskAdjusted<threshold)status='欠品'+Math.round(risk*100)+'%で送料無料割れリスク';else status='送料無料ライン +'+yen(total-threshold)+'余裕'}
-    return {total:total,threshold:threshold,riskAdjusted:riskAdjusted,status:status};
+    else if(minimum>0&&thresholdAmount<minimum)status='最低発注まで '+yen(minimum-thresholdAmount)+' 不足'+basisLabel;
+    else if(threshold>0){
+      if(thresholdAmount<threshold)status='送料無料まで '+yen(threshold-thresholdAmount)+' 不足'+basisLabel+(num(cfg.shipping)>0?' / 送料'+yen(cfg.shipping):'');
+      else if(riskAdjusted<threshold)status='欠品'+Math.round(risk*100)+'%で送料無料割れリスク'+basisLabel;
+      else status='送料無料ライン +'+yen(thresholdAmount-threshold)+'余裕'+basisLabel;
+    }else if(num(cfg.shipping)>0)status='通常送料 '+yen(cfg.shipping);
+    return {total:total,thresholdAmount:thresholdAmount,threshold:threshold,riskAdjusted:riskAdjusted,status:status};
   }
 
   function setOverride(key,patch){state.overrides[key]=Object.assign({},state.overrides[key]||{},patch);persist()}
