@@ -349,9 +349,9 @@
   function bindTable(root){
     $$('[data-proc-qty]',root).forEach(function(i){i.onchange=function(){setOverride(i.dataset.procQty,{qty:Math.max(0,num(i.value))});render()}});
     $$('[data-proc-pack]',root).forEach(function(i){i.onchange=function(){setOverride(i.dataset.procPack,{pack:Math.max(1,num(i.value,1)),qty:null});var ov=state.overrides[i.dataset.procPack]||{};delete ov.qty;state.overrides[i.dataset.procPack]=ov;persist();render()}});
-    $$('[data-proc-air-unit]',root).forEach(function(el){el.onchange=function(){setOverride(el.dataset.procAirUnit,{airUnit:el.value,orderUnit:el.value});render()}});
-    $$('[data-proc-carton-size]',root).forEach(function(el){el.onchange=function(){setOverride(el.dataset.procCartonSize,{cartonSize:Math.max(1,num(el.value,1))});render()}});
-    $$('[data-proc-order-unit]',root).forEach(function(el){el.onchange=function(){setOverride(el.dataset.procOrderUnit,{orderUnit:el.value});var ov=state.overrides[el.dataset.procOrderUnit]||{};delete ov.qty;state.overrides[el.dataset.procOrderUnit]=ov;persist();render()}});
+    $('[data-proc-air-unit]',root).forEach(function(el){el.onchange=function(){var key=el.dataset.procAirUnit,ov=state.overrides[key]||{};ov.airUnit=el.value;ov.orderUnit=el.value;delete ov.qty;state.overrides[key]=ov;persist();render()}});
+    $('[data-proc-carton-size]',root).forEach(function(el){el.onchange=function(){var key=el.dataset.procCartonSize,ov=state.overrides[key]||{};ov.cartonSize=Math.max(1,num(el.value,1));delete ov.qty;state.overrides[key]=ov;persist();render()}});
+    $('[data-proc-order-unit]',root).forEach(function(el){el.onchange=function(){var key=el.dataset.procOrderUnit,ov=state.overrides[key]||{};ov.orderUnit=el.value;delete ov.qty;state.overrides[key]=ov;persist();render()}});
     $$('[data-proc-route]',root).forEach(function(el){el.onchange=function(){setOverride(el.dataset.procRoute,{route:el.value,routeLocked:true});render()}});
   }
 
