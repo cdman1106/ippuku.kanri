@@ -138,6 +138,9 @@
     var groups={},result={};
     (master||[]).forEach(function(p){
       if(String(p.visible).indexOf('非表示')>=0)return;
+      if(/廃盤|非継続/.test(String(p.note||'')))return;
+      var sid=supplierFor(p);
+      if(!SUPPLIERS.some(function(x){return x.id===sid})&&!looksTobacco(p))return;
       var fam=packagingFamilyName(p.name);
       (groups[fam]||(groups[fam]=[])).push(p);
     });
@@ -170,6 +173,7 @@
     var packagingMap=buildPackagingMap(state.master),out=[];
     (state.master||[]).forEach(function(p){
       if(String(p.visible).indexOf('非表示')>=0)return;
+      if(/廃盤|非継続/.test(String(p.note||'')))return;
       var k=keyOf(p),si=sales[k]||sales['bc:'+p.barcode]||sales['n:'+norm(p.name)]||{},ii=inv[k]||inv['bc:'+p.barcode]||inv['n:'+norm(p.name)]||{};
       var supplier=supplierFor(p),ov=state.overrides[k]||{},pkg=packagingFor(p,packagingMap),airFactor=pkg.airUnit==='carton'?pkg.cartonSize:1,orderFactor=pkg.orderUnit==='carton'?pkg.cartonSize:1;
       var soldRaw=num(si.qty),stockRaw=num(ii.stock),sold=soldRaw*airFactor,stock=stockRaw*airFactor,forecast=sold*(targetDays/salesDays),need=Math.max(0,forecast-stock),step=Math.max(1,num(ov.pack,1));
@@ -287,11 +291,11 @@
 
   function productPanel(rows){
     var suppliers=['all'].concat(SUPPLIERS.map(function(s){return s.id}),['UNKNOWN']);
-    return '<section class="panel proc-block"><div class="panel-head"><div><h3>④ 商品別 発注優先順位</h3><p>単品とカートンを分離。カートンは入数で単品換算して不足率を計算します。</p></div><input id="procSearch" class="search" placeholder="商品名・JANで検索"></div><div class="proc-filters">'+suppliers.map(function(id){return '<button class="filter '+(id==='all'?'active':'')+'" data-proc-supplier-filter="'+id+'">'+(id==='all'?'すべて':id==='UNKNOWN'?'未判定':esc(supplierCfg(id).name))+'</button>'}).join('')+'</div><div class="table-scroll proc-table-wrap"><table class="proc-table proc-pack-table"><thead><tr><th>優先</th><th>商品</th><th>仕入先</th><th>Air単位</th><th>入数</th><th>'+esc(state.settings.salesDays||60)+'日販売</th><th>在庫</th><th>'+esc(state.settings.targetDays||45)+'日予測</th><th>充足率</th><th>発注単位</th><th>発注刻み</th><th>推奨</th><th>発注数</th><th>発注先</th><th>金額</th></tr></thead><tbody id="procTableBody">'+productRows(rows)+'</tbody></table></div></section>';
+    return '<section class="panel proc-block"><div class="panel-head"><div><h3>④ 商品別 発注優先順位</h3><p>単品とカートンを分離。カートンは入数で単品換算して不足率を計算します。</p></div><input id="procSearch" class="search" placeholder="商品名・JANで検索"></div><div class="proc-unit-filter-row"><button class="filter active" data-proc-unit-filter="all">すべて</button><button class="filter" data-proc-unit-filter="single">単品</button><button class="filter" data-proc-unit-filter="carton">カートン</button></div><div class="proc-filters">'+suppliers.map(function(id){return '<button class="filter '+(id==='all'?'active':'')+'" data-proc-supplier-filter="'+id+'">'+(id==='all'?'すべて':id==='UNKNOWN'?'未判定':esc(supplierCfg(id).name))+'</button>'}).join('')+'</div><div class="table-scroll proc-table-wrap"><table class="proc-table proc-pack-table"><thead><tr><th>優先</th><th>商品</th><th>仕入先</th><th>Air単位</th><th>入数</th><th>'+esc(state.settings.salesDays||60)+'日販売</th><th>在庫</th><th>'+esc(state.settings.targetDays||45)+'日予測</th><th>充足率</th><th>発注単位</th><th>発注刻み</th><th>推奨</th><th>発注数</th><th>発注先</th><th>金額</th></tr></thead><tbody id="procTableBody">'+productRows(rows)+'</tbody></table></div></section>';
   }
-  function productRows(rows,filter,search){
-    filter=filter||'all';search=norm(search||'');
-    return rows.filter(function(r){if(r.recommended<=0&&!r.newProduct)return false;if(filter==='UNKNOWN'&&r.supplier)return false;if(filter!=='all'&&filter!=='UNKNOWN'&&r.supplier!==filter)return false;if(search&&norm(r.name+' '+r.barcode).indexOf(search)<0)return false;return true}).slice(0,800).map(function(r){
+  function productRows(rows,filter,search,unitFilter){
+    filter=filter||'all';unitFilter=unitFilter||'all';search=norm(search||'');
+    return rows.filter(function(r){if(r.recommended<=0&&!r.newProduct)return false;if(filter==='UNKNOWN'&&r.supplier)return false;if(filter!=='all'&&filter!=='UNKNOWN'&&r.supplier!==filter)return false;if(unitFilter!=='all'&&r.airUnit!==unitFilter)return false;if(search&&norm(r.name+' '+r.barcode).indexOf(search)<0)return false;return true}).slice(0,800).map(function(r){
       var rate=r.fill>=100?'∞':Math.max(0,r.fill*100).toFixed(0)+'%',urgent=r.newProduct?'新規':(r.fill<0.35?'至急':r.fill<0.7?'高':'通常'),route=routeOf(r),routes=[['direct',supplierCfg(r.supplier).name||'直接']];
       if(r.tsEligible)routes.push(['ts_mixed','TS混合']);
       if(r.isJT)routes=[['jt_normal','JT通常便'],['jt_regular','JT定期便待ち']];
@@ -335,10 +339,11 @@
       persist();applyAutoPlan(buildRows());render();alert('発注条件を保存しました');
     };
     var newBtn=$('#procNewProduct',root);if(newBtn)newBtn.onclick=openNewProduct;
-    var search=$('#procSearch',root),activeFilter='all';
-    function redrawTable(){var body=$('#procTableBody',root);if(body){body.innerHTML=productRows(buildRows(),activeFilter,search?search.value:'');bindTable(body)}}
+    var search=$('#procSearch',root),activeFilter='all',activeUnitFilter='all';
+    function redrawTable(){var body=$('#procTableBody',root);if(body){body.innerHTML=productRows(buildRows(),activeFilter,search?search.value:'',activeUnitFilter);bindTable(body)}}
     if(search)search.oninput=redrawTable;
-    $$('[data-proc-supplier-filter]',root).forEach(function(b){b.onclick=function(){$$('[data-proc-supplier-filter]',root).forEach(function(x){x.classList.remove('active')});b.classList.add('active');activeFilter=b.dataset.procSupplierFilter;redrawTable()}});
+    $('[data-proc-supplier-filter]',root).forEach(function(b){b.onclick=function(){$('[data-proc-supplier-filter]',root).forEach(function(x){x.classList.remove('active')});b.classList.add('active');activeFilter=b.dataset.procSupplierFilter;redrawTable()}});
+    $('[data-proc-unit-filter]',root).forEach(function(b){b.onclick=function(){$('[data-proc-unit-filter]',root).forEach(function(x){x.classList.remove('active')});b.classList.add('active');activeUnitFilter=b.dataset.procUnitFilter;redrawTable()}});
     bindTable(root);
     $$('[data-proc-doc]',root).forEach(function(b){b.onclick=function(){openOrderDocument(b.dataset.procDoc)}});
     $$('[data-proc-fax]',root).forEach(function(b){b.onclick=function(){sendFaxGroup(b.dataset.procFax)}});
