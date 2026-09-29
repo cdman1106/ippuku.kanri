@@ -347,10 +347,9 @@
     return false;
   }
   function topUpGroupToFreeShipping(rows,id){
-    var threshold=thresholdForGroup(id);
+    var supplier=groupSupplier(id),cfg=supplierCfg(supplier),groupRows=rows.filter(function(r){return r.qty>0&&groupId(r)===id}),threshold=thresholdForGroup(id,groupRows);
     if(threshold<=0)return;
-    var supplier=groupSupplier(id),cfg=supplierCfg(supplier),buffer=Math.max(0,num(state.settings.freeBufferPct,10))/100,target=threshold*(1+buffer),maxDays=Math.max(7,num(state.settings.maxForwardDays,21));
-    var groupRows=rows.filter(function(r){return r.qty>0&&groupId(r)===id});
+    var buffer=Math.max(0,num(state.settings.freeBufferPct,10))/100,target=threshold*(1+buffer),maxDays=Math.max(7,num(state.settings.maxForwardDays,21));
     var subtotal=thresholdSubtotal(groupRows,cfg);
     if(subtotal>=target)return;
     var candidates=rows.filter(function(r){
@@ -390,9 +389,10 @@
       var route=suggestedRoute(r);
       if(route==='direct'&&r.tsEligible){
         var cfg=supplierCfg(r.supplier);
-        var supplierItems=rows.filter(function(x){return x.supplier===r.supplier&&x.recommended>0&&!x.isJT});
+        var supplierItems=rows.filter(function(x){return x.supplier===r.supplier&&x.recommended>0&&!x.isJT&&!x.missingCost});
         var supplierTotal=thresholdSubtotal(supplierItems,cfg);
-        if(cfg.free>0&&supplierTotal<cfg.free)route='ts_mixed';
+        var directRequirement=Math.max(num(cfg.free),num(cfg.min));
+        if(directRequirement>0&&supplierTotal<directRequirement)route='ts_mixed';
       }
       state.overrides[k]=Object.assign({},ov,{route:route});
     });
@@ -413,7 +413,13 @@
   function groupSupplier(id){if(id==='TS_MIXED'||id==='JT_REGULAR'||id==='JT_NORMAL')return 'TS';if(id.indexOf('DIRECT_')===0)return id.replace('DIRECT_','');return ''}
 
   function groups(rows){var m={};rows.filter(function(r){return r.qty>0}).forEach(function(r){var id=groupId(r);(m[id]||(m[id]=[])).push(r)});return m}
-  function thresholdForGroup(id){if(id==='TS_MIXED')return num(supplierCfg('TS').free,30000);if(id==='JT_REGULAR'||id==='JT_NORMAL'||id==='HOLD')return 0;return num(supplierCfg(groupSupplier(id)).free)}
+  function thresholdForGroup(id,items){
+    if(id==='TS_MIXED')return num(supplierCfg('TS').free,30000);
+    if(id==='JT_REGULAR'||id==='JT_NORMAL'||id==='HOLD')return 0;
+    var sid=groupSupplier(id),cfg=supplierCfg(sid);
+    if(sid==='MS'&&(items||[]).some(function(r){return !looksTobacco(r)}))return 20000;
+    return num(cfg.free);
+  }
   function thresholdSubtotal(items,cfg){
     var useRetail=String((cfg&&cfg.basis)||'')==='上代';
     return items.reduce(function(a,r){return a+r.qty*(useRetail?num(r.price):num(r.cost))},0);
@@ -429,7 +435,7 @@
   }
 
   function groupStats(id,items){
-    var supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):{},total=items.reduce(function(a,r){return a+r.qty*r.cost},0),thresholdAmount=thresholdSubtotal(items,cfg),threshold=thresholdForGroup(id),minimum=num(cfg.min),risk=Math.max(0,Math.min(100,num(state.settings.shortageRisk,5)))/100,riskAdjusted=thresholdAmount*(1-risk),bufferPct=Math.max(0,num(state.settings.freeBufferPct,10)),bufferTarget=threshold*(1+bufferPct/100);
+    var supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):{},total=items.reduce(function(a,r){return a+r.qty*r.cost},0),thresholdAmount=thresholdSubtotal(items,cfg),threshold=thresholdForGroup(id,items),minimum=num(cfg.min),risk=Math.max(0,Math.min(100,num(state.settings.shortageRisk,5)))/100,riskAdjusted=thresholdAmount*(1-risk),bufferPct=Math.max(0,num(state.settings.freeBufferPct,10)),bufferTarget=threshold*(1+bufferPct/100);
     var basisLabel=cfg.basis?(' / '+cfg.basis+'基準'):'',status='条件未設定';
     if(id==='JT_REGULAR')status='定期配送なら送料無料';
     else if(id==='JT_NORMAL')status='通常送料あり';
@@ -474,7 +480,7 @@
 
   function settingsPanel(){
     var st=state.settings;
-    return '<details class="panel proc-block proc-settings"><summary><strong>② 発注条件・仕入先設定</strong><span>不足率 / 送料無料 / 送料 / 締切 / 支払 / FAX / JT定期便</span></summary>'+
+    return '<details class="panel proc-block proc-settings"><summary><strong>② 発注条件・仕入先設定</strong><span>週1発注 / 送料無料 / 最低発注 / 送料 / 締切 / 支払 / JT定期便</span></summary>'+
       '<div class="proc-settings-grid">'+
         field('販売実績日数','procSalesDays',st.salesDays||60,'number')+field('発注間隔（日）','procCycleDays',st.orderCycleDays||7,'number')+field('安全在庫（日）','procSafetyDays',st.safetyDays||7,'number')+field('標準リード日数','procLeadDays',st.defaultLeadDays||2,'number')+field('前倒し上限（日）','procForwardDays',st.maxForwardDays||21,'number')+field('送料無料余白（%）','procFreeBuffer',st.freeBufferPct==null?10:st.freeBufferPct,'number')+field('欠品想定率（%）','procRisk',st.shortageRisk||5,'number')+field('次回JT定期配送日','procJtDate',st.nextJtRegularDate||'','date')+field('Mac FAX Bridge','procBridgeUrl',st.bridgeUrl||'http://127.0.0.1:8765','text')+
       '</div><div class="proc-supplier-settings">'+SUPPLIERS.map(function(x){var c=supplierCfg(x.id);return '<div class="proc-supplier-setting"><div class="proc-supplier-main"><strong>'+esc(c.name)+'</strong><small>'+esc(c.note||'')+'</small></div><label>送料無料ライン<input type="number" data-supplier-free="'+x.id+'" value="'+esc(c.free||'')+'" placeholder="未設定"></label><label>最低発注<input type="number" data-supplier-min="'+x.id+'" value="'+esc(c.min||'')+'"></label><label>通常送料<input type="number" data-supplier-shipping="'+x.id+'" value="'+esc(c.shipping||'')+'"></label><label>リード日数<input type="number" min="0" data-supplier-lead="'+x.id+'" value="'+esc(c.leadDays==null?'':c.leadDays)+'" placeholder="標準"></label><label>判定基準<select data-supplier-basis="'+x.id+'"><option value="" '+(!c.basis?'selected':'')+'>未設定</option><option value="下代" '+(c.basis==='下代'?'selected':'')+'>下代</option><option value="上代" '+(c.basis==='上代'?'selected':'')+'>上代</option></select></label><label>発注締切<input data-supplier-cutoff="'+x.id+'" value="'+esc(c.cutoff||'')+'" placeholder="例 12:00"></label><label>配送目安<input data-supplier-delivery="'+x.id+'" value="'+esc(c.delivery||'')+'" placeholder="例 翌々日"></label><label>注文方法<input data-supplier-method="'+x.id+'" value="'+esc(c.method||'')+'"></label><label>支払方法<input data-supplier-payment="'+x.id+'" value="'+esc(c.payment||'')+'"></label><label>FAX<input data-supplier-fax="'+x.id+'" value="'+esc(c.fax||'')+'" placeholder="未設定"></label><label class="proc-checkline"><input type="checkbox" data-supplier-samples="'+x.id+'" '+(c.samples?'checked':'')+'><span>サンプル期待</span></label><label class="proc-checkline"><input type="checkbox" data-supplier-ts="'+x.id+'" '+(c.tsFallback?'checked':'')+'><span>たばこはTS代替候補</span></label></div>'}).join('')+'</div><div class="proc-actions"><button class="primary-btn" id="procSaveSettings">設定を保存</button></div></details>';
@@ -486,7 +492,7 @@
     return '<section class="proc-block"><div class="proc-title-row"><div><h3>③ 今回の推奨発注案</h3><p>人間が最終確認してから注文書/FAXへ進みます。</p></div><div class="proc-actions"><button class="ghost" id="procNewProduct">＋ 新規商品</button><button class="primary-btn" id="procFaxAll">FAX可能分を一括送信</button></div></div>'+(ids.length?'<div class="proc-group-grid">'+ids.map(function(id){return groupCard(id,gs[id],rows)}).join('')+'</div>':'<div class="panel proc-empty">CSVを3つ読み込むと発注案を表示します。</div>')+'</section>';
   }
   function groupCard(id,items,allRows){
-    var st=groupStats(id,items),supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):null,weekly=weeklyPotentialSpend(id,allRows),threshold=thresholdForGroup(id),danger=st.status.indexOf('リスク')>=0||st.status.indexOf('不足')>=0;
+    var st=groupStats(id,items),supplier=groupSupplier(id),cfg=supplier?supplierCfg(supplier):null,weekly=weeklyPotentialSpend(id,allRows),threshold=thresholdForGroup(id,items),danger=st.status.indexOf('リスク')>=0||st.status.indexOf('不足')>=0;
     var top=items.slice().sort(function(a,b){return a.fill-b.fill}).slice(0,4);
     var meta=cfg?['注文 '+(cfg.method||'未設定'),cfg.cutoff?('締切 '+cfg.cutoff):'',cfg.delivery?('配送 '+cfg.delivery):'',cfg.samples?'サンプル期待あり':''].filter(Boolean).join(' / '):'';
     var sustainability=threshold>0&&weekly<threshold?'<div class="proc-weekly-warning">週需要見込み '+yen(weekly)+' / 送料無料 '+yen(threshold)+'。毎週送料無料は前倒しだけでは持続しにくいため、TS集約・発注週調整の候補です。</div>':'';
