@@ -169,9 +169,12 @@
       var k=keyOf(p),si=lookupById(sales,p),ii=lookupById(inv,p),salesMatched=!!si,inventoryMatched=!!ii;
       si=si||{};ii=ii||{};
       var supplier=supplierFor(p),ov=state.overrides[k]||{},sold=num(si.qty),stock=num(ii.stock),forecast=sold*(targetDays/salesDays),need=Math.max(0,forecast-stock),step=Math.max(1,num(ov.pack,1));
-      var recommended=inventoryMatched&&need>0?Math.ceil(need/step)*step:0,fill=forecast>0?stock/forecast:999,daily=sold/salesDays,qty=Math.max(0,num(ov.qty,recommended));
+      var noRecentSales=sold<=0;
+      var recommended=!noRecentSales&&inventoryMatched&&need>0?Math.ceil(need/step)*step:0;
+      var fill=forecast>0?stock/forecast:999,daily=sold/salesDays;
+      var qty=noRecentSales?0:Math.max(0,num(ov.qty,recommended));
       var isJT=String(p.note||'').trim()==='JT';
-      out.push({key:k,id:String(p.id).trim(),name:p.name,barcode:p.barcode,category:p.category,cost:num(p.cost),price:num(p.price),note:p.note,supplier:supplier,sold:sold,stock:stock,forecast:forecast,need:need,fill:fill,daily:daily,pack:step,recommended:recommended,qty:qty,inventoryMatched:inventoryMatched,salesMatched:salesMatched,tsEligible:defaultTsEligible(p,supplier),route:ov.route||'',isJT:isJT,newProduct:false});
+      out.push({key:k,id:String(p.id).trim(),name:p.name,barcode:p.barcode,category:p.category,cost:num(p.cost),price:num(p.price),note:p.note,supplier:supplier,sold:sold,stock:stock,forecast:forecast,need:need,fill:fill,daily:daily,pack:step,recommended:recommended,qty:qty,noRecentSales:noRecentSales,inventoryMatched:inventoryMatched,salesMatched:salesMatched,tsEligible:defaultTsEligible(p,supplier),route:ov.route||'',isJT:isJT,newProduct:false});
     });
     (state.manual||[]).forEach(function(p){
       var k='manual:'+p.uid,ov=state.overrides[k]||{},qty=Math.max(0,num(ov.qty,p.initialQty||1)),step=Math.max(1,num(ov.pack,p.pack||1));
@@ -183,6 +186,7 @@
 
   function daysUntil(dateStr){if(!dateStr)return null;var d=new Date(dateStr+'T12:00:00'),now=new Date();return Math.ceil((d-now)/86400000)}
   function suggestedRoute(r){
+    if(r.noRecentSales&&!r.newProduct)return 'hold';
     if(r.qty<=0)return 'hold';
     if(!r.supplier||!SUPPLIERS.some(function(x){return x.id===r.supplier}))return 'hold';
     if(r.isJT){
@@ -284,7 +288,7 @@
   function productRows(rows,filter,search){
     filter=filter||'all';search=norm(search||'');
     return rows.filter(function(r){
-      if(r.recommended<=0&&!r.newProduct&&((state.inventory||[]).length===0||r.inventoryMatched))return false;
+      if(r.recommended<=0&&!r.newProduct&&!r.noRecentSales&&((state.inventory||[]).length===0||r.inventoryMatched))return false;
       if(filter==='UNKNOWN'&&r.supplier)return false;
       if(filter!=='all'&&filter!=='UNKNOWN'&&r.supplier!==filter)return false;
       if(search&&norm(r.name+' '+r.id).indexOf(search)<0)return false;
@@ -296,7 +300,8 @@
       routes.push(['hold','見送り']);
       var stockText=((state.inventory||[]).length&&!r.inventoryMatched&&!r.newProduct)?'<span class="proc-unmatched">未照合</span>':r.stock.toFixed(1);
       var salesText=((state.sales||[]).length&&!r.salesMatched&&!r.newProduct)?'<span class="proc-unmatched">未照合</span>':r.sold.toFixed(0);
-      return '<tr data-proc-row="'+esc(r.key)+'"><td><span class="proc-priority p-'+urgent+'">'+urgent+'</span></td><td><strong>'+esc(r.name)+'</strong><small>'+esc(r.barcode||'JANなし')+(r.newProduct?' / 新規':'')+'</small></td><td><code>'+esc(r.id||'未登録')+'</code></td><td>'+esc(r.supplier?supplierCfg(r.supplier).name:'未判定')+(r.tsEligible?'<small>TS代替候補</small>':'')+'</td><td>'+salesText+'</td><td>'+stockText+'</td><td>'+r.forecast.toFixed(1)+'</td><td><b>'+rate+'</b></td><td><input class="proc-mini" type="number" min="1" data-proc-pack="'+esc(r.key)+'" value="'+r.pack+'"></td><td>'+r.recommended+'</td><td><input class="proc-mini" type="number" min="0" data-proc-qty="'+esc(r.key)+'" value="'+r.qty+'"></td><td><select data-proc-route="'+esc(r.key)+'">'+routes.map(function(x){return '<option value="'+x[0]+'" '+(route===x[0]?'selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></td><td>'+yen(r.qty*r.cost)+'</td></tr>';
+      var noSalesNote=r.noRecentSales&&!r.newProduct?'<small class="proc-nosales">過去2カ月販売0 → 発注しない</small>':'';
+      return '<tr data-proc-row="'+esc(r.key)+'"><td><span class="proc-priority p-'+urgent+'">'+urgent+'</span></td><td><strong>'+esc(r.name)+'</strong><small>'+esc(r.barcode||'JANなし')+(r.newProduct?' / 新規':'')+'</small>'+noSalesNote+'</td><td><code>'+esc(r.id||'未登録')+'</code></td><td>'+esc(r.supplier?supplierCfg(r.supplier).name:'未判定')+(r.tsEligible?'<small>TS代替候補</small>':'')+'</td><td>'+salesText+'</td><td>'+stockText+'</td><td>'+r.forecast.toFixed(1)+'</td><td><b>'+rate+'</b></td><td><input class="proc-mini" type="number" min="1" data-proc-pack="'+esc(r.key)+'" value="'+r.pack+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td>'+r.recommended+'</td><td><input class="proc-mini" type="number" min="0" data-proc-qty="'+esc(r.key)+'" value="'+r.qty+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'></td><td><select data-proc-route="'+esc(r.key)+'" '+(r.noRecentSales&&!r.newProduct?'disabled':'')+'>'+routes.map(function(x){return '<option value="'+x[0]+'" '+(route===x[0]?'selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></td><td>'+yen(r.qty*r.cost)+'</td></tr>';
     }).join('');
   }
 
