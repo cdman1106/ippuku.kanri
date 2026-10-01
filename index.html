@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>いっぷく 店舗管理</title>
-<link rel="stylesheet" href="./styles.css?v=20261001-01">
+<link rel="stylesheet" href="./styles.css?v=20261001-02">
 </head>
 <body>
 <div id="app">
@@ -155,6 +155,13 @@
       <div class="customer-head"><div><span class="eyebrow">喫煙カフェ いっぷく</span><h2>モバイルオーダー</h2></div><div class="seat-pill">席 <strong id="customerSeat">未選択</strong></div></div>
       <section id="customerPromo" class="customer-promo"></section>
       <div id="seatClosedNotice" class="seat-closed-notice" style="display:none"><strong>この席の注文受付は終了しました</strong><span>追加注文はできません。必要な場合はスタッフへお声がけください。</span></div>
+      <details class="customer-order-history" id="customerOrderHistory">
+        <summary>
+          <div><span class="eyebrow">ORDER HISTORY</span><strong>注文履歴</strong></div>
+          <span id="customerHistoryMeta">まだ注文はありません</span>
+        </summary>
+        <div class="customer-history-list" id="customerHistoryList"><div class="customer-history-empty">この席ではまだ注文していません。</div></div>
+      </details>
       <div class="customer-menu-head"><div><span class="eyebrow">MENU</span><h3>商品を選ぶ</h3></div><small>＋ を押すとカートに入ります</small></div>
       <div id="customerCategoryFilters" class="customer-category-filters"></div>
       <div class="one-drink-note"><strong>☕ ワンドリンクオーダー制</strong><span>2Fをご利用のお客様は、お一人様につきドリンク1杯以上のご注文をお願いいたします。</span></div>
@@ -194,6 +201,6 @@
 
 <script src="./sales-data.js?v=20260919-1"></script>
 <script src="./menu-data.js?v=20260919-13"></script>
-<script src="./app.js?v=20260929-01"></script>
+<script src="./app.js?v=20261001-02"></script>
 </body>
 </html>
