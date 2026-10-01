@@ -1753,3 +1753,112 @@ textarea:-webkit-autofill,select:-webkit-autofill{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
 }
+
+
+/* ===== Customer order history + lightweight rendering ===== */
+body.customer-mode .customer-order-history{
+  margin:0 0 14px;
+  border:1px solid #e3ddd6;
+  border-radius:15px;
+  background:#fff;
+  overflow:hidden;
+}
+body.customer-mode .customer-order-history summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  min-height:62px;
+  padding:11px 13px;
+  cursor:pointer;
+  list-style:none;
+  -webkit-tap-highlight-color:transparent;
+}
+body.customer-mode .customer-order-history summary::-webkit-details-marker{display:none}
+body.customer-mode .customer-order-history summary>div{min-width:0}
+body.customer-mode .customer-order-history summary .eyebrow{
+  display:block;
+  margin-bottom:3px;
+  color:#887665!important;
+  font-size:8px;
+}
+body.customer-mode .customer-order-history summary strong{
+  display:block;
+  color:#241f1b!important;
+  font-size:15px;
+}
+body.customer-mode #customerHistoryMeta{
+  flex:0 0 auto;
+  color:#6f6258!important;
+  font-size:11px;
+  font-weight:800;
+}
+body.customer-mode .customer-order-history[open] summary{
+  border-bottom:1px solid #ebe5df;
+}
+body.customer-mode .customer-history-list{
+  padding:9px;
+}
+body.customer-mode .customer-history-empty{
+  padding:16px 10px;
+  text-align:center;
+  color:#85786e;
+  font-size:11px;
+}
+body.customer-mode .customer-history-order{
+  padding:11px;
+  border:1px solid #e7e1db;
+  border-radius:12px;
+  background:#fbfaf8;
+}
+body.customer-mode .customer-history-order+.customer-history-order{margin-top:8px}
+body.customer-mode .customer-history-order-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding-bottom:8px;
+}
+body.customer-mode .customer-history-order-head>div strong{
+  display:inline-block;
+  color:#241f1b!important;
+  font-size:13px;
+}
+body.customer-mode .customer-history-order-head>div small{
+  display:inline-block;
+  margin-left:7px;
+  padding:4px 7px;
+  border-radius:999px;
+  background:#f0ebe5;
+  color:#62574f!important;
+  font-size:9px;
+  font-weight:800;
+}
+body.customer-mode .customer-history-order-head>b{
+  color:#241f1b!important;
+  font-size:15px;
+}
+body.customer-mode .customer-history-items{
+  border-top:1px solid #eee8e2;
+}
+body.customer-mode .customer-history-item{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  padding:8px 0;
+  color:#403730;
+  font-size:11px;
+  line-height:1.45;
+}
+body.customer-mode .customer-history-item strong{
+  flex:0 0 auto;
+  color:#403730!important;
+  font-size:11px;
+}
+body.customer-mode .customer-history-fee{color:#675d72}
+body.customer-mode .menu-card{
+  content-visibility:auto;
+  contain-intrinsic-size:220px;
+}
+body.customer-mode .menu-photo{content-visibility:auto}
