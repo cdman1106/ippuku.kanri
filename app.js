@@ -742,7 +742,11 @@
     if(customerSeatTimer){clearInterval(customerSeatTimer);customerSeatTimer=null}
     if(!customerSeat||!backendReady)return;
     refreshCustomerSeatAccess(false);
-    customerSeatTimer=setInterval(function(){refreshCustomerSeatAccess(true)},8000);
+    customerSeatTimer=setInterval(function(){
+      refreshCustomerSeatAccess(true);
+      var historySection=$('#customerOrderHistory');
+      if(historySection&&historySection.open)loadCustomerOrderHistory(true);
+    },8000);
   }
 
   function stopCustomerSeatWatch(){
