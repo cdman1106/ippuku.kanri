@@ -445,21 +445,41 @@ async function getOrder(env, id) {
 async function listOrders(request, env) {
   await ensureOrdersTables(env);
   const url = new URL(request.url);
-  const after = url.searchParams.get("after");
+  let after = url.searchParams.get("after");
+  const seat = String(url.searchParams.get("seat") || "");
+  const sessionOnly = url.searchParams.get("session") === "1";
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit") || 100)));
 
-  let stmt;
-  if (after) {
-    stmt = env.DB.prepare(
-      "SELECT id, seat, status, total, note, created_at, updated_at FROM orders WHERE created_at > ? ORDER BY created_at DESC LIMIT ?"
-    ).bind(after, limit);
-  } else {
-    stmt = env.DB.prepare(
-      "SELECT id, seat, status, total, note, created_at, updated_at FROM orders ORDER BY created_at DESC LIMIT ?"
-    ).bind(limit);
+  if (seat && !SEATS.has(seat)) {
+    return json({ ok: false, error: "INVALID_SEAT" }, 400);
   }
 
-  const orderResult = await stmt.all();
+  // お客様向け履歴は現在の着席セッションだけに限定。
+  if (seat && sessionOnly) {
+    const access = await getSeatAccess(env, seat);
+    const sessionStart = access.updatedAt || currentBusinessDayStartIso();
+    if (!after || new Date(sessionStart).getTime() > new Date(after).getTime()) {
+      after = sessionStart;
+    }
+  }
+
+  let sql = "SELECT id, seat, status, total, note, created_at, updated_at FROM orders";
+  const where = [];
+  const binds = [];
+
+  if (seat) {
+    where.push("seat = ?");
+    binds.push(seat);
+  }
+  if (after) {
+    where.push("created_at >= ?");
+    binds.push(after);
+  }
+  if (where.length) sql += " WHERE " + where.join(" AND ");
+  sql += " ORDER BY created_at DESC LIMIT ?";
+  binds.push(limit);
+
+  const orderResult = await env.DB.prepare(sql).bind(...binds).all();
   const rows = orderResult.results || [];
   if (!rows.length) return json({ ok: true, orders: [] });
 
@@ -499,7 +519,6 @@ async function listOrders(request, env) {
     }))
   });
 }
-
 async function createOrder(request, env) {
   await ensureOrdersTables(env);
   const body = await request.json().catch(() => null);
@@ -1181,15 +1200,16 @@ export default {
     }
     const assetResponse = await env.ASSETS.fetch(request);
     const headers = new Headers(assetResponse.headers);
-    if (
-      url.pathname === "/" ||
-      url.pathname.endsWith(".html") ||
-      url.pathname.endsWith(".js") ||
-      url.pathname.endsWith(".css")
-    ) {
+    if (url.pathname === "/" || url.pathname.endsWith(".html")) {
       headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
       headers.set("Pragma", "no-cache");
       headers.set("Expires", "0");
+    } else if (url.pathname.endsWith(".js") || url.pathname.endsWith(".css")) {
+      if (url.searchParams.has("v")) {
+        headers.set("Cache-Control", "public, max-age=31536000, immutable");
+      } else {
+        headers.set("Cache-Control", "public, max-age=300");
+      }
     }
     return new Response(assetResponse.body, {
       status: assetResponse.status,
