@@ -457,7 +457,11 @@ async function listOrders(request, env) {
   // お客様向け履歴は現在の着席セッションだけに限定。
   if (seat && sessionOnly) {
     const access = await getSeatAccess(env, seat);
-    const sessionStart = access.updatedAt || currentBusinessDayStartIso();
+    const businessStart = currentBusinessDayStartIso();
+    const sessionStart =
+      access.updatedAt && new Date(access.updatedAt).getTime() > new Date(businessStart).getTime()
+        ? access.updatedAt
+        : businessStart;
     if (!after || new Date(sessionStart).getTime() > new Date(after).getTime()) {
       after = sessionStart;
     }
