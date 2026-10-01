@@ -1436,3 +1436,320 @@ textarea:-webkit-autofill,select:-webkit-autofill{
     padding:6px;
   }
 }
+
+
+/* ===== 2026-10-01 iPad staff layout ===== */
+/* Staff screen only. Customer mobile-order layout is intentionally untouched. */
+@media (min-width:700px) and (max-width:1366px){
+  body:not(.customer-mode){
+    -webkit-text-size-adjust:100%;
+  }
+  body:not(.customer-mode) main{
+    width:100%;
+    max-width:none;
+    padding:18px 18px calc(104px + env(safe-area-inset-bottom));
+  }
+  body:not(.customer-mode) .topbar{
+    min-height:72px;
+    padding:12px 18px;
+    gap:16px;
+  }
+  body:not(.customer-mode) .topbar h1{
+    font-size:20px;
+  }
+  body:not(.customer-mode) .top-actions{
+    gap:9px;
+    flex:0 0 auto;
+  }
+  body:not(.customer-mode) .top-actions button,
+  body:not(.customer-mode) .section-head button,
+  body:not(.customer-mode) .panel button,
+  body:not(.customer-mode) .modal button{
+    min-height:46px;
+  }
+  body:not(.customer-mode) .ghost,
+  body:not(.customer-mode) .primary-btn,
+  body:not(.customer-mode) .upload-btn{
+    padding:11px 15px;
+    font-size:13px;
+  }
+  body:not(.customer-mode) .icon-btn{
+    width:46px;
+    min-width:46px;
+    height:46px;
+    padding:0;
+  }
+
+  body:not(.customer-mode) .section-head{
+    margin:22px 0 12px;
+    gap:14px;
+  }
+  body:not(.customer-mode) .section-head h2{
+    font-size:22px;
+  }
+  body:not(.customer-mode) .section-head p{
+    font-size:13px;
+    line-height:1.5;
+  }
+
+  body:not(.customer-mode) .hero-grid,
+  body:not(.customer-mode) .quick-grid{
+    gap:12px;
+  }
+  body:not(.customer-mode) .metric{
+    min-height:118px;
+    padding:16px;
+  }
+  body:not(.customer-mode) .metric strong{
+    margin:12px 0 5px;
+    font-size:25px;
+  }
+  body:not(.customer-mode) .quick{
+    min-height:88px;
+    padding:15px;
+  }
+  body:not(.customer-mode) .quick strong{
+    margin-top:8px;
+    font-size:21px;
+  }
+  body:not(.customer-mode) .panel{
+    padding:16px;
+  }
+
+  /* iPad dock navigation */
+  body:not(.customer-mode) .bottom-nav{
+    left:50%;
+    right:auto;
+    bottom:calc(10px + env(safe-area-inset-bottom));
+    width:min(820px,calc(100vw - 28px));
+    max-width:none;
+    transform:translateX(-50%);
+    display:grid;
+    grid-template-columns:repeat(7,minmax(0,1fr));
+    gap:4px;
+    padding:7px;
+    border-radius:20px;
+  }
+  body:not(.customer-mode) .nav-item{
+    min-width:0;
+    min-height:58px;
+    padding:7px 5px;
+    border-radius:14px;
+    touch-action:manipulation;
+  }
+  body:not(.customer-mode) .nav-item span{
+    font-size:21px;
+    line-height:1.1;
+  }
+  body:not(.customer-mode) .nav-item small{
+    display:block;
+    margin-top:3px;
+    font-size:10px;
+    line-height:1.1;
+    white-space:nowrap;
+  }
+
+  /* Touch-friendly controls */
+  body:not(.customer-mode) .filter,
+  body:not(.customer-mode) .status-btn,
+  body:not(.customer-mode) .inventory-shop-filter{
+    min-height:44px;
+    padding:9px 13px;
+    font-size:12px;
+  }
+  body:not(.customer-mode) .status-row{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:7px;
+  }
+  body:not(.customer-mode) .status-row .status-btn{
+    width:100%;
+  }
+  body:not(.customer-mode) .search,
+  body:not(.customer-mode) .stock-input,
+  body:not(.customer-mode) .form-row input,
+  body:not(.customer-mode) .form-row select,
+  body:not(.customer-mode) .line-copy-text{
+    min-height:46px;
+    font-size:16px;
+  }
+  body:not(.customer-mode) .modal{
+    width:min(640px,calc(100vw - 40px));
+    max-height:calc(100vh - 48px);
+    padding:22px;
+  }
+
+  /* Order list */
+  body:not(.customer-mode) .order-card{
+    min-height:84px;
+    padding:14px 16px;
+  }
+  body:not(.customer-mode) .order-seat{
+    font-size:22px;
+  }
+  body:not(.customer-mode) .order-card b{
+    font-size:14px;
+    line-height:1.55;
+  }
+  body:not(.customer-mode) .order-card p{
+    font-size:11px;
+  }
+  body:not(.customer-mode) .order-card-actions{
+    min-width:68px;
+    gap:8px;
+  }
+  body:not(.customer-mode) .status-chip{
+    padding:7px 9px;
+    font-size:11px;
+  }
+  body:not(.customer-mode) .danger-link{
+    min-height:36px;
+    padding:7px;
+  }
+
+  /* Analysis/table usability */
+  body:not(.customer-mode) .table-scroll{
+    -webkit-overflow-scrolling:touch;
+    border-radius:12px;
+  }
+  body:not(.customer-mode) th,
+  body:not(.customer-mode) td{
+    padding:12px 10px;
+    font-size:12px;
+  }
+
+  /* Inventory / reserve */
+  body:not(.customer-mode) .inventory-card,
+  body:not(.customer-mode) .reserve-card{
+    min-height:70px;
+  }
+  body:not(.customer-mode) .stock-input{
+    width:86px;
+    text-align:center;
+  }
+  body:not(.customer-mode) .inventory-edit-btn{
+    min-height:40px;
+    padding:9px 12px;
+    font-size:11px;
+  }
+  body:not(.customer-mode) .reserve-card .ghost{
+    min-width:74px;
+  }
+
+  /* New-order alarm sized for iPad */
+  body:not(.customer-mode) .order-alarm-card{
+    justify-content:flex-start;
+    padding-left:24px!important;
+    padding-right:24px!important;
+  }
+  body:not(.customer-mode) .alarm-summary{
+    width:min(680px,100%)!important;
+  }
+  body:not(.customer-mode) .alarm-seat{
+    width:min(680px,100%)!important;
+  }
+  body:not(.customer-mode) .alarm-stop{
+    left:50px;
+    right:50px;
+    min-height:92px;
+  }
+}
+
+/* iPad portrait */
+@media (min-width:700px) and (max-width:999px){
+  body:not(.customer-mode) .hero-grid,
+  body:not(.customer-mode) .quick-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  body:not(.customer-mode) .two-col,
+  body:not(.customer-mode) .analytics-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+  }
+  body:not(.customer-mode) .settings-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  body:not(.customer-mode) .strategy-summary{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  body:not(.customer-mode) .strategy-cards{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  body:not(.customer-mode) .seat-layout-wrap{
+    grid-template-columns:1fr;
+    gap:14px;
+  }
+  body:not(.customer-mode) .floorplan{
+    min-height:610px;
+  }
+  body:not(.customer-mode) .seat{
+    width:58px;
+    height:58px;
+    font-size:10px;
+  }
+  body:not(.customer-mode) .seat-detail{
+    min-height:300px;
+    padding:16px;
+  }
+
+  body:not(.customer-mode) .inventory-section-grid{
+    grid-template-columns:1fr;
+  }
+  body:not(.customer-mode) .order-card{
+    grid-template-columns:76px minmax(0,1fr) auto;
+  }
+  body:not(.customer-mode) .qr-links{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+/* iPad landscape */
+@media (min-width:1000px) and (max-width:1366px){
+  body:not(.customer-mode) main{
+    padding-left:20px;
+    padding-right:20px;
+  }
+  body:not(.customer-mode) .hero-grid,
+  body:not(.customer-mode) .quick-grid{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+  body:not(.customer-mode) .two-col,
+  body:not(.customer-mode) .analytics-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  body:not(.customer-mode) .settings-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  body:not(.customer-mode) .seat-layout-wrap{
+    grid-template-columns:minmax(0,1.45fr) minmax(330px,.85fr);
+    gap:16px;
+    align-items:start;
+  }
+  body:not(.customer-mode) .floorplan{
+    min-height:650px;
+  }
+  body:not(.customer-mode) .seat-detail{
+    position:sticky;
+    top:88px;
+    max-height:calc(100vh - 190px);
+    overflow:auto;
+    overscroll-behavior:contain;
+  }
+
+  body:not(.customer-mode) .orders-list{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+  }
+  body:not(.customer-mode) .order-card{
+    grid-template-columns:72px minmax(0,1fr) auto;
+    gap:12px;
+  }
+  body:not(.customer-mode) .inventory-section-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  body:not(.customer-mode) .qr-links{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
