@@ -447,24 +447,10 @@ async function listOrders(request, env) {
   const url = new URL(request.url);
   let after = url.searchParams.get("after");
   const seat = String(url.searchParams.get("seat") || "");
-  const sessionOnly = url.searchParams.get("session") === "1";
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit") || 100)));
 
   if (seat && !SEATS.has(seat)) {
     return json({ ok: false, error: "INVALID_SEAT" }, 400);
-  }
-
-  // お客様向け履歴は現在の着席セッションだけに限定。
-  if (seat && sessionOnly) {
-    const access = await getSeatAccess(env, seat);
-    const businessStart = currentBusinessDayStartIso();
-    const sessionStart =
-      access.updatedAt && new Date(access.updatedAt).getTime() > new Date(businessStart).getTime()
-        ? access.updatedAt
-        : businessStart;
-    if (!after || new Date(sessionStart).getTime() > new Date(after).getTime()) {
-      after = sessionStart;
-    }
   }
 
   let sql = "SELECT id, seat, status, total, note, created_at, updated_at FROM orders";
@@ -550,9 +536,6 @@ async function createOrder(request, env) {
     }
   }
 
-  const access = await getSeatAccess(env, seat);
-  if (!access.open) return json({ ok: false, error: "SEAT_CLOSED" }, 403);
-
   const rawItems = Array.isArray(body.items) ? body.items : [];
   if (!rawItems.length || rawItems.length > 50) {
     return json({ ok: false, error: "INVALID_ITEMS" }, 400);
@@ -575,9 +558,19 @@ async function createOrder(request, env) {
     }, 409);
   }
 
+  const businessStart = currentBusinessDayStartIso();
+  const requestedSessionStart = String(body.sessionStartedAt || "");
+  const requestedMs = new Date(requestedSessionStart).getTime();
+  const businessMs = new Date(businessStart).getTime();
+  const nowMs = Date.now();
+  const sessionStart =
+    Number.isFinite(requestedMs) && requestedMs >= businessMs && requestedMs <= nowMs
+      ? new Date(requestedMs).toISOString()
+      : businessStart;
+
   const drinkSatisfied =
     hasDrinkInItems(items) ||
-    await hasDrinkForSeatSession(env, seat, access.updatedAt);
+    await hasDrinkForSeatSession(env, seat, sessionStart);
   if (!drinkSatisfied) {
     return json({
       ok: false,
@@ -1124,10 +1117,6 @@ async function handleApi(request, env) {
     if (!SEATS.has(seat)) return json({ ok: false, error: "INVALID_SEAT" }, 400);
     return json({ ok: true, ...(await getSeatAccess(env, seat)) });
   }
-  if (seatMatch && request.method === "PATCH") {
-    return setSeatAccess(request, env, decodeURIComponent(seatMatch[1]));
-  }
-
   if (url.pathname === "/api/bridge/auth/activate" && request.method === "POST") {
     return activateBridgeAuth(request, env);
   }
