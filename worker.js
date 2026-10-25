@@ -27,7 +27,7 @@ const ORDER_MENU = {
 
   "コーラ": {category:"Refresh", price:550, option:"NONE"},
   "みかんジュース": {category:"Refresh", price:560, option:"NONE"},
-  "青森りんご100%/炭酸": {category:"Refresh", price:650, option:"NONE"},
+  "青森りんご100%/炭酸": {category:"Refresh", price:660, option:"NONE"},
   "ペリエ": {category:"Refresh", price:580, option:"NONE"},
   "モンスター": {category:"Refresh", price:580, option:"NONE"},
 
@@ -64,7 +64,7 @@ const AIR_BUILTIN_MAP = {
 
   "コーラ": {"":"2000000000237"},
   "みかんジュース": {"":"2000000000176"},
-  // 青森りんご100%/炭酸 はWeb 650円 / AirレジCSV 660円のため誤請求防止で未登録。
+  "青森りんご100%/炭酸": {"":"2000000000169"},
   "ペリエ": {"":"2000000000183"},
   "モンスター": {"":"2000000000190"},
 

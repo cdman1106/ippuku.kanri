@@ -31,7 +31,7 @@ window.MENU_DATA = [
 
   {name:"コーラ",category:"Refresh",price:550},
   {name:"みかんジュース",category:"Refresh",price:560,description:"つぶ入り"},
-  {name:"青森りんご100%/炭酸",category:"Refresh",price:650},
+  {name:"青森りんご100%/炭酸",category:"Refresh",price:660},
   {name:"ペリエ",category:"Refresh",price:580,description:"レモン果汁添え"},
   {name:"モンスター",category:"Refresh",price:580},
 
