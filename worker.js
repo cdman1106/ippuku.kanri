@@ -969,7 +969,7 @@ async function claimBridgeOrder(request, env) {
   // 1回のOR+CASE検索では大量の古い注文を毎回走査してしまう可能性があるため
   // 適切な索引を使用できる2つの軽量クエリに分ける。
   const manualRow = await env.DB.prepare(
-    "SELECT id FROM orders WHERE bridge_status = 'pending' AND status = 'ordered' AND bridge_error = 'MANUAL_RETRY' ORDER BY created_at ASC LIMIT 1"
+    "SELECT id FROM orders INDEXED BY idx_orders_bridge_manual_retry WHERE bridge_status = 'pending' AND status = 'ordered' AND bridge_error = 'MANUAL_RETRY' ORDER BY created_at ASC LIMIT 1"
   ).first();
   const row = manualRow || await env.DB.prepare(
     "SELECT id FROM orders WHERE bridge_status = 'pending' AND status = 'ordered' AND created_at >= ? ORDER BY created_at ASC LIMIT 1"
