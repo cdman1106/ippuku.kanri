@@ -598,8 +598,9 @@
       await loadAirMappings();
       await syncSharedStates();
       await syncOrdersFromServer(true);
-      // 3秒ごとに1行だけ確認し、変更がある場合に限り明細を取得する。
-      if(!serverSyncTimer)serverSyncTimer=setInterval(pollOrderRevision,3000);
+      // 無料枠対策: 5秒ごとに変更番号1行のみ確認。画面非表示中は通信しない。
+      // 注文が増減した場合にのみ注文明細を再取得する。
+      if(!serverSyncTimer)serverSyncTimer=setInterval(pollOrderRevision,5000);
       if(!sharedStateTimer)sharedStateTimer=setInterval(function(){
         if(!document.hidden&&!document.body.classList.contains('customer-mode'))syncSharedStates();
       },60000);
@@ -793,6 +794,11 @@
     if(backendReady)await syncOrdersFromServer(true);
     else await detectBackend();
   };
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden&&backendReady&&!document.body.classList.contains('customer-mode')){
+      pollOrderRevision();
+    }
+  });
   $('#enableOrderSound').onclick=enableOrderSound;
   $('#stopOrderAlarm').onclick=stopOrderAlarm;
   updateSoundButton();

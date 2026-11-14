@@ -259,6 +259,11 @@ async function initializeOrdersTables(env) {
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_bridge_status ON orders(bridge_status, created_at)").run();
+  // カスタマー履歴の席+開始時刻、Air Bridgeの注文待ちを索引で引く。
+  // OR / CASE の全件走査を避け、アイドル時のD1行読み取りを抑える。
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_seat_created_at ON orders(seat, created_at DESC)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_bridge_poll ON orders(bridge_status, status, created_at)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_bridge_manual_retry ON orders(created_at) WHERE bridge_status = 'pending' AND status = 'ordered' AND bridge_error = 'MANUAL_RETRY'").run();
   await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_client_request_id ON orders(client_request_id) WHERE client_request_id != ''").run();
 
   await env.DB.prepare(
@@ -960,9 +965,14 @@ async function claimBridgeOrder(request, env) {
     if (sessionStartedAt > since) since = sessionStartedAt;
   }
 
-  // 監視開始前の古いpendingは飛ばし、開始後だけをFIFO処理する。
-  const row = await env.DB.prepare(
-    "SELECT id FROM orders WHERE status = 'ordered' AND bridge_status = 'pending' AND (created_at >= ? OR bridge_error = 'MANUAL_RETRY') ORDER BY CASE WHEN bridge_error = 'MANUAL_RETRY' THEN 0 ELSE 1 END, created_at ASC LIMIT 1"
+  // 明示的な手動再試行を優先し、それ以外は監視開始後の注文だけFIFOで受け取る。
+  // 1回のOR+CASE検索では大量の古い注文を毎回走査してしまう可能性があるため
+  // 適切な索引を使用できる2つの軽量クエリに分ける。
+  const manualRow = await env.DB.prepare(
+    "SELECT id FROM orders INDEXED BY idx_orders_bridge_manual_retry WHERE bridge_status = 'pending' AND status = 'ordered' AND bridge_error = 'MANUAL_RETRY' ORDER BY created_at ASC LIMIT 1"
+  ).first();
+  const row = manualRow || await env.DB.prepare(
+    "SELECT id FROM orders WHERE bridge_status = 'pending' AND status = 'ordered' AND created_at >= ? ORDER BY created_at ASC LIMIT 1"
   ).bind(since).first();
 
   if (!row) return json({ ok: true, order: null });
