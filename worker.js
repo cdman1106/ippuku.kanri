@@ -213,7 +213,18 @@ async function addColumnIfMissing(env, table, columns, name, sql) {
   columns.add(name);
 }
 
+// スキーマ確認・索引作成はWorkerインスタンス当たり一度だけ実施する。
+let ordersTablesPromise = null;
 async function ensureOrdersTables(env) {
+  if (!ordersTablesPromise) {
+    ordersTablesPromise = initializeOrdersTables(env).catch((error) => {
+      ordersTablesPromise = null;
+      throw error;
+    });
+  }
+  return ordersTablesPromise;
+}
+async function initializeOrdersTables(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, seat TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ordered', total INTEGER NOT NULL DEFAULT 0, note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
   ).run();
@@ -261,6 +272,28 @@ async function ensureOrdersTables(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS bridge_config (config_key TEXT PRIMARY KEY, value_text TEXT NOT NULL, updated_at TEXT NOT NULL)"
   ).run();
+  // 1行のバージョン番号で注文変更を検出し、全注文を頻繁に再取得しない。
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS order_revision (id INTEGER PRIMARY KEY CHECK(id = 1), version INTEGER NOT NULL DEFAULT 0)"
+  ).run();
+}
+
+function orderRevisionIncrement(env) {
+  return env.DB.prepare(
+    "INSERT INTO order_revision (id, version) VALUES (1, 1) ON CONFLICT(id) DO UPDATE SET version = version + 1"
+  );
+}
+
+async function getOrderRevision(env) {
+  const row = await env.DB.prepare(
+    "SELECT version FROM order_revision WHERE id = 1"
+  ).first();
+  return Number(row?.version || 0);
+}
+
+async function orderRevisionStatus(env) {
+  await ensureOrdersTables(env);
+  return json({ ok: true, revision: await getOrderRevision(env) });
 }
 
 async function hasDrinkForSeatSession(env, seat, since) {
@@ -444,6 +477,8 @@ async function getOrder(env, id) {
 
 async function listOrders(request, env) {
   await ensureOrdersTables(env);
+  // 注文取得より先に版を読む。処理中の注文が取りこぼされないようにする。
+  const revision = await getOrderRevision(env);
   const url = new URL(request.url);
   let after = url.searchParams.get("after");
   const seat = String(url.searchParams.get("seat") || "");
@@ -471,19 +506,22 @@ async function listOrders(request, env) {
 
   const orderResult = await env.DB.prepare(sql).bind(...binds).all();
   const rows = orderResult.results || [];
-  if (!rows.length) return json({ ok: true, orders: [] });
+  if (!rows.length) return json({ ok: true, revision, orders: [] });
 
   const ids = rows.map((x) => x.id);
-  const placeholders = ids.map(() => "?").join(",");
-  const itemsResult = await env.DB.prepare(
-    `SELECT order_id, name, display_name, category, price, qty, option_text
-     FROM order_items
-     WHERE order_id IN (${placeholders})
-     ORDER BY id ASC`
-  ).bind(...ids).all();
-
   const byOrder = new Map(ids.map((id) => [id, []]));
-  for (const x of (itemsResult.results || [])) {
+  // D1にはSQLのバインド数上限があるため、200件の注文は小分けにする。
+  const allItems = [];
+  for (let i = 0; i < ids.length; i += 80) {
+    const chunk = ids.slice(i, i + 80);
+    const placeholders = chunk.map(() => "?").join(",");
+    const itemsResult = await env.DB.prepare(
+      `SELECT order_id, name, display_name, category, price, qty, option_text
+       FROM order_items WHERE order_id IN (${placeholders}) ORDER BY id ASC`
+    ).bind(...chunk).all();
+    allItems.push(...(itemsResult.results || []));
+  }
+  for (const x of allItems) {
     if (!byOrder.has(x.order_id)) byOrder.set(x.order_id, []);
     byOrder.get(x.order_id).push({
       name: x.name,
@@ -497,6 +535,7 @@ async function listOrders(request, env) {
 
   return json({
     ok: true,
+    revision,
     orders: rows.map((row) => ({
       id: row.id,
       seat: row.seat,
@@ -624,16 +663,16 @@ async function createOrder(request, env) {
   const total = subtotal + nightFee;
 
   try {
-    await env.DB.prepare(
+    const orderInsert = env.DB.prepare(
       "INSERT INTO orders (id, seat, status, total, note, created_at, updated_at, bridge_status, client_request_id) VALUES (?, ?, 'ordered', ?, ?, ?, ?, 'pending', ?)"
-    ).bind(id, seat, total, note, now, now, requestId).run();
-
+    ).bind(id, seat, total, note, now, now, requestId);
     const itemStatements = items.map((item) =>
       env.DB.prepare(
         "INSERT INTO order_items (order_id, name, display_name, category, price, qty, option_text) VALUES (?, ?, ?, ?, ?, ?, ?)"
       ).bind(id, item.name, item.displayName || item.name, item.category, item.price, item.qty, item.option)
     );
-    if (itemStatements.length) await env.DB.batch(itemStatements);
+    // 注文本体・明細・変更版の更新を1つのトランザクションにまとめる。
+    await env.DB.batch([orderInsert, ...itemStatements, orderRevisionIncrement(env)]);
 
     return json({ ok: true, duplicate: false, order: await getOrder(env, id) }, 201);
   } catch (error) {
@@ -668,11 +707,14 @@ async function updateOrder(request, env, id) {
   if (!STATUSES.has(status)) return json({ ok: false, error: "INVALID_STATUS" }, 400);
 
   const now = new Date().toISOString();
-  const result = await env.DB.prepare(
-    "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?"
-  ).bind(status, now, id).run();
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?"
+    ).bind(status, now, id),
+    orderRevisionIncrement(env)
+  ]);
 
-  if (!result.meta?.changes) return json({ ok: false, error: "NOT_FOUND" }, 404);
+  if (!results[0]?.meta?.changes) return json({ ok: false, error: "NOT_FOUND" }, 404);
   return json({ ok: true, order: await getOrder(env, id) });
 }
 
@@ -683,7 +725,8 @@ async function deleteOrder(env, id) {
 
   await env.DB.batch([
     env.DB.prepare("DELETE FROM order_items WHERE order_id = ?").bind(id),
-    env.DB.prepare("DELETE FROM orders WHERE id = ?").bind(id)
+    env.DB.prepare("DELETE FROM orders WHERE id = ?").bind(id),
+    orderRevisionIncrement(env)
   ]);
   return json({ ok: true });
 }
@@ -1158,6 +1201,9 @@ async function handleApi(request, env) {
     if (action === "recover" && request.method === "POST") return recoverBridgeOrder(request, env, id);
   }
 
+  if (url.pathname === "/api/orders/revision" && request.method === "GET") {
+    return orderRevisionStatus(env);
+  }
   if (url.pathname === "/api/orders" && request.method === "GET") {
     return listOrders(request, env);
   }
