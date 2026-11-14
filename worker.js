@@ -258,12 +258,9 @@ async function initializeOrdersTables(env) {
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)").run();
-  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_bridge_status ON orders(bridge_status, created_at)").run();
-  // カスタマー履歴の席+開始時刻、Air Bridgeの注文待ちを索引で引く。
-  // OR / CASE の全件走査を避け、アイドル時のD1行読み取りを抑える。
+  // Galaxyの注文監視は停止。座席別注文履歴用の索引のみ維持する。
+  // 既存DBのBridge関連索引・データは削除せず、履歴を保全する。
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_seat_created_at ON orders(seat, created_at DESC)").run();
-  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_bridge_poll ON orders(bridge_status, status, created_at)").run();
-  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_bridge_manual_retry ON orders(created_at) WHERE bridge_status = 'pending' AND status = 'ordered' AND bridge_error = 'MANUAL_RETRY'").run();
   await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_client_request_id ON orders(client_request_id) WHERE client_request_id != ''").run();
 
   await env.DB.prepare(
@@ -623,27 +620,8 @@ async function createOrder(request, env) {
     }, 409);
   }
 
-  // 本番では、Airレジへ確実に自動入力できない商品を注文確定させない。
-  // これにより未対応商品1件がFIFO先頭で止まり、その後の全注文を塞ぐ事故を防ぐ。
-  const unavailable = [];
-  for (const item of items) {
-    const code = await resolveAirCode(env, item.name, item.option || "");
-    if (!code) {
-      unavailable.push({
-        name: item.name,
-        displayName: item.displayName || item.name,
-        option: item.option || ""
-      });
-    }
-  }
-  if (unavailable.length) {
-    return json({
-      ok: false,
-      error: "AIRREGI_UNAVAILABLE",
-      message: "現在モバイル注文に対応していない商品が含まれています。スタッフへご注文ください。",
-      items: unavailable
-    }, 409);
-  }
+  // GalaxyでAirレジに自動入力しないため、Airレジバーコード対応の可否では
+  // お客様のモバイル注文を拒否しない。商品の正当性・ワンドリンク確認は維持する。
 
   const id = crypto.randomUUID();
   const nowDate = new Date();
@@ -669,7 +647,7 @@ async function createOrder(request, env) {
 
   try {
     const orderInsert = env.DB.prepare(
-      "INSERT INTO orders (id, seat, status, total, note, created_at, updated_at, bridge_status, client_request_id) VALUES (?, ?, 'ordered', ?, ?, ?, ?, 'pending', ?)"
+      "INSERT INTO orders (id, seat, status, total, note, created_at, updated_at, bridge_status, client_request_id) VALUES (?, ?, 'ordered', ?, ?, ?, ?, 'legacy', ?)"
     ).bind(id, seat, total, note, now, now, requestId);
     const itemStatements = items.map((item) =>
       env.DB.prepare(
@@ -1140,6 +1118,18 @@ async function handleApi(request, env) {
   if (!env.DB) return json({ ok: false, error: "D1_NOT_BOUND" }, 503);
 
   const url = new URL(request.url);
+
+  // Galaxy S10の注文監視を廃止。端末が古いアプリでアクセスしても
+  // 注文の取得・状態変更・D1読み取りは一切行わない。
+  // claimは従来どおり「注文なし」を返し、古い端末での再送・二重処理を防止。
+  if (url.pathname === "/api/bridge/claim" && request.method === "POST") {
+    return json({ ok: true, order: null, disabled: true });
+  }
+  // 商品マッピングは管理画面のAirレジ用バーコード表示でも使用するため維持。
+  if (url.pathname.startsWith("/api/bridge/") && url.pathname !== "/api/bridge/mappings") {
+    return json({ ok: false, error: "BRIDGE_DISABLED", message: "Galaxyの注文監視は停止しています。" }, 410);
+  }
+
   if (url.pathname === "/api/health" && request.method === "GET") {
     await ensureOrdersTables(env);
     await ensureSeatAccessTable(env);
