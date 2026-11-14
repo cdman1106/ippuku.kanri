@@ -788,7 +788,7 @@
     if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory'){renderInventory();if(backendReady)syncSharedStateKey('inventory')} if(name==='reserve'){renderReserves();if(backendReady)syncSharedStateKey('reserves')} if(name==='customer'){renderCustomer();if(backendReady)syncSharedStateKey('promos');startCustomerHistoryWatch()}else{stopCustomerHistoryWatch()}
     window.scrollTo(0,0);
   }
-  $('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){history.replaceState(null,'',location.pathname+'?order=1');customerSeat='';page('customer')}; $('#refreshBtn').onclick=async function(){
+  $$('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){history.replaceState(null,'',location.pathname+'?order=1');customerSeat='';page('customer')}; $('#refreshBtn').onclick=async function(){
     renderAll();
     if(backendReady)await syncOrdersFromServer(true);
     else await detectBackend();
