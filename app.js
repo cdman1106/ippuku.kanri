@@ -366,6 +366,7 @@
 
 
   var backendReady=false, backendChecked=false, serverOrdersInitialized=false, serverSeenIds=new Set(), serverSyncTimer=null, sharedStateTimer=null, sharedPending=load('ippukuSharedPending',{});
+  var serverOrderRevision=null, orderSyncInFlight=false, revisionPollInFlight=false;
 
   async function apiRequest(path,options){
     try{
@@ -484,25 +485,86 @@
     return pushSharedState('sales',sales);
   }
 
-  async function syncOrdersFromServer(initial){
-    if(!backendReady||document.body.classList.contains('customer-mode'))return;
-    var result=await apiRequest('/api/orders?limit=200');
-    if(!result.ok||!result.data||!Array.isArray(result.data.orders))return;
-    var incoming=result.data.orders;
-    var fresh=[];
-    if(serverOrdersInitialized&&!initial){
-      fresh=incoming.filter(function(o){return !serverSeenIds.has(String(o.id))});
+  function orderApiErrorMessage(result,action){
+    var detail=String(result&&result.data&&result.data.detail||'');
+    var code=String(result&&result.data&&result.data.error||'');
+    if(/exceeded D1.s free tier daily row read limit/i.test(detail)){
+      return action+'できません。Cloudflare D1の無料枠（1日の読み取り上限）に達しています。翌日UTC 0時（日本時間9時）のリセット後に再試行してください。';
     }
-    orders=incoming;
-    save('ippukuOrders',orders);
-    serverSeenIds=new Set(incoming.map(function(o){return String(o.id)}));
-    serverOrdersInitialized=true;
-    renderDashboard();
-    renderOrders();
-    renderSeats();
-    if(fresh.length){
-      fresh.sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});
-      startOrderAlarm(fresh[0]);
+    if(result&&result.status===0)return action+'できません。端末の接続状況をご確認ください。';
+    if(code==='NOT_FOUND')return action+'できません。対象の注文がサーバーにありません。画面の更新をお試しください。';
+    return action+'できませんでした（HTTP '+String(result&&result.status||'不明')+(code?' / '+code:'')+'）'+(detail?'\n詳細: '+detail.slice(0,200):'');
+  }
+
+  function showOrderSyncNotice(result){
+    if(document.body.classList.contains('customer-mode'))return;
+    var bar=document.querySelector('.topbar');
+    if(!bar)return;
+    var notice=document.getElementById('orderSyncNotice');
+    if(!notice){
+      notice=document.createElement('div');
+      notice.id='orderSyncNotice';
+      notice.setAttribute('role','status');
+      notice.style.cssText='padding:8px 12px;background:#fff1df;color:#783d00;border:1px solid #f5b763;border-radius:8px;font-size:13px;max-width:430px;';
+      bar.appendChild(notice);
+    }
+    notice.textContent=orderApiErrorMessage(result,'注文データを同期');
+  }
+  function clearOrderSyncNotice(){
+    var notice=document.getElementById('orderSyncNotice');
+    if(notice)notice.remove();
+  }
+
+  async function syncOrdersFromServer(initial){
+    if(!backendReady||document.body.classList.contains('customer-mode')||orderSyncInFlight)return false;
+    orderSyncInFlight=true;
+    try{
+      var result=await apiRequest('/api/orders?limit=200');
+      if(!result.ok||!result.data||!Array.isArray(result.data.orders)){
+        showOrderSyncNotice(result);
+        return false;
+      }
+      var incoming=result.data.orders;
+      var fresh=[];
+      if(serverOrdersInitialized&&!initial){
+        fresh=incoming.filter(function(o){return !serverSeenIds.has(String(o.id))});
+      }
+      orders=incoming;
+      save('ippukuOrders',orders);
+      serverSeenIds=new Set(incoming.map(function(o){return String(o.id)}));
+      serverOrdersInitialized=true;
+      if(Number.isFinite(Number(result.data.revision)))serverOrderRevision=Number(result.data.revision);
+      clearOrderSyncNotice();
+      renderDashboard();
+      renderOrders();
+      renderSeats();
+      if(fresh.length){
+        fresh.sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});
+        startOrderAlarm(fresh[0]);
+      }
+      return true;
+    }finally{
+      orderSyncInFlight=false;
+    }
+  }
+
+  async function pollOrderRevision(){
+    if(!backendReady||revisionPollInFlight||orderSyncInFlight||
+       document.hidden||document.body.classList.contains('customer-mode'))return;
+    revisionPollInFlight=true;
+    try{
+      var result=await apiRequest('/api/orders/revision');
+      if(!result.ok||!result.data||!Number.isFinite(Number(result.data.revision))){
+        showOrderSyncNotice(result);
+        return;
+      }
+      if(serverOrderRevision===null||Number(result.data.revision)!==serverOrderRevision){
+        await syncOrdersFromServer(false);
+      }else{
+        clearOrderSyncNotice();
+      }
+    }finally{
+      revisionPollInFlight=false;
     }
   }
 
@@ -536,32 +598,46 @@
       await loadAirMappings();
       await syncSharedStates();
       await syncOrdersFromServer(true);
-      if(!serverSyncTimer)serverSyncTimer=setInterval(function(){syncOrdersFromServer(false)},2000);
-      if(!sharedStateTimer)sharedStateTimer=setInterval(function(){syncSharedStates()},10000);
+      // 3秒ごとに1行だけ確認し、変更がある場合に限り明細を取得する。
+      if(!serverSyncTimer)serverSyncTimer=setInterval(pollOrderRevision,3000);
+      if(!sharedStateTimer)sharedStateTimer=setInterval(function(){
+        if(!document.hidden&&!document.body.classList.contains('customer-mode'))syncSharedStates();
+      },60000);
+    }else if(!customerMode){
+      showOrderSyncNotice(result);
     }
     return backendReady;
   }
   async function setOrderStatus(order,status){
+    if(order.status===status)return;
+    if(!backendReady){
+      alert('サーバーに接続できないため注文状態は変更していません。画面を再読み込みして再試行してください。');
+      return;
+    }
     var old=order.status;
     order.status=status;
     save('ippukuOrders',orders);
     renderAll();
-    if(!backendReady)return;
     var result=await apiRequest('/api/orders/'+encodeURIComponent(order.id),{
       method:'PATCH',
       body:JSON.stringify({status:status})
     });
     if(!result.ok){
-      order.status=old;
+      var current=orders.find(function(o){return String(o.id)===String(order.id)});
+      if(current)current.status=old;
       save('ippukuOrders',orders);
       renderAll();
-      alert('注文状態を更新できませんでした。通信状態を確認してください。');
+      alert(orderApiErrorMessage(result,'注文状態を更新'));
       return;
     }
     await syncOrdersFromServer(true);
   }
 
   async function removeOrderById(id){
+    if(!backendReady){
+      alert('サーバーに接続できないため注文は削除していません。');
+      return false;
+    }
     var previous=orders.slice();
     orders=orders.filter(function(x){return String(x.id)!==String(id)});
     save('ippukuOrders',orders);
@@ -572,7 +648,7 @@
       orders=previous;
       save('ippukuOrders',orders);
       renderAll();
-      alert('注文を削除できませんでした。通信状態を確認してください。');
+      alert(orderApiErrorMessage(result,'注文を削除'));
       return false;
     }
     await syncOrdersFromServer(true);
@@ -712,7 +788,11 @@
     if(name==='seats') renderSeats(); if(name==='orders') renderOrders(); if(name==='analytics') renderAnalytics(); if(name==='inventory'){renderInventory();if(backendReady)syncSharedStateKey('inventory')} if(name==='reserve'){renderReserves();if(backendReady)syncSharedStateKey('reserves')} if(name==='customer'){renderCustomer();if(backendReady)syncSharedStateKey('promos');startCustomerHistoryWatch()}else{stopCustomerHistoryWatch()}
     window.scrollTo(0,0);
   }
-  $$('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){history.replaceState(null,'',location.pathname+'?order=1');customerSeat='';page('customer')}; $('#refreshBtn').onclick=renderAll;
+  $('[data-go]').forEach(function(b){b.onclick=function(){page(b.dataset.go)}}); $('#openCustomer').onclick=function(){history.replaceState(null,'',location.pathname+'?order=1');customerSeat='';page('customer')}; $('#refreshBtn').onclick=async function(){
+    renderAll();
+    if(backendReady)await syncOrdersFromServer(true);
+    else await detectBackend();
+  };
   $('#enableOrderSound').onclick=enableOrderSound;
   $('#stopOrderAlarm').onclick=stopOrderAlarm;
   updateSoundButton();
